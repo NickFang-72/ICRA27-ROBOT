@@ -1,0 +1,39 @@
+{
+  "demo_id": "put_money_in_safe_episode161_0_63",
+  "task": "put_money_in_safe",
+  "language_description": "put the money away in the safe on the bottom shelf",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "laptop",
+    "part_geometry": [
+      "keyboard",
+      "screen"
+    ],
+    "size": "small",
+    "aspect_ratio": "16:9",
+    "orientation": "sideways",
+    "front_face_direction": "left",
+    "pose_relation": "standing",
+    "opening_geometry": "closed",
+    "axis_geometry": "vertical",
+    "symmetry": "left-right",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "keyboard",
+      "screen"
+    ],
+    "uncertain_fields": [
+      "safe_location"
+    ],
+    "key_features": [
+      "safe",
+      "rectangular",
+      "hollow",
+      "slot",
+      "front_opening"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction.",
+    "manipulated_object": "money_and_safe"
+  },
+  "raw_output": "{\n  \"primary_shape\": \"laptop\",\n  \"part_geometry\": [\"keyboard\", \"screen\"],\n  \"size\": \"small\",\n  \"aspect_ratio\": \"16:9\",\n  \"orientation\": \"sideways\",\n  \"front_face_direction\": \"left\",\n  \"pose_relation\": \"standing\",\n  \"opening_geometry\": \"closed\",\n  \"axis_geometry\": \"vertical\",\n  \"symmetry\": \"left-right\",\n  \"clearance_geometry\": \"none\",\n  \"task_relevant_geometric_cues\": [\"keyboard\", \"screen\"],\n  \"uncertain_fields\": [\"safe_location\"]\n}"
+}

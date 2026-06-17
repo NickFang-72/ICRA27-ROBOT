@@ -1,0 +1,55 @@
+{
+  "demo_id": "turn_tap_episode161_0_71",
+  "task": "turn_tap",
+  "language_description": "turn left tap",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/robopoint-v1-vicuna-v1.5-13b",
+  "images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/turn_tap_episode161_0_71/0.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/turn_tap_episode161_0_71/0.png"
+  ],
+  "affordance_a_i": {
+    "grasp_affordance": "knob_grasp",
+    "contact_affordance": "rotate_part",
+    "motion_affordance": "rotate",
+    "support_affordance": "none",
+    "containment_affordance": "none",
+    "articulation_affordance": "screw_twist",
+    "required_contact_region": "tap_handle_or_knob",
+    "preferred_contact_points": [
+      [
+        0.358,
+        0.61
+      ],
+      [
+        0.359,
+        0.569
+      ],
+      [
+        0.328,
+        0.598
+      ],
+      [
+        0.389,
+        0.6
+      ],
+      [
+        0.33,
+        0.64
+      ]
+    ],
+    "precision_requirement": "medium",
+    "force_requirement": "medium",
+    "failure_sensitive_property": "wrong_axis",
+    "raw_robopoint_text": "[(0.358, 0.610), (0.359, 0.569), (0.328, 0.598), (0.389, 0.600), (0.330, 0.640)]",
+    "source_note": "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders.",
+    "vision_tower_note": "Pilot run uses the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR because openai/clip-vit-large-patch14-336 PyTorch weights could not be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates."
+  },
+  "raw_answer_record": {
+    "question_id": "turn_tap_episode161_0_71",
+    "prompt": "Task instruction: turn left tap\nFor robot manipulation, identify the best visible contact or grasp affordance points for accomplishing this task. Return several normalized image keypoints as a list of tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region and motion affordance.",
+    "text": "[(0.358, 0.610), (0.359, 0.569), (0.328, 0.598), (0.389, 0.600), (0.330, 0.640)]",
+    "answer_id": "gmUTtqZDcbnYNkQawkzvRW",
+    "model_id": "robopoint-v1-vicuna-v1.5-13b",
+    "category": "agnostos_affordance_probe"
+  }
+}

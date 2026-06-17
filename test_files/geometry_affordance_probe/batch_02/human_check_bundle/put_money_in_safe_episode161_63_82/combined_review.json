@@ -1,0 +1,90 @@
+{
+  "demo_id": "put_money_in_safe_episode161_63_82",
+  "task": "put_money_in_safe",
+  "language_description": "put the money away in the safe on the bottom shelf",
+  "demo_dir": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/put_money_in_safe_episode161_63_82",
+  "images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/put_money_in_safe_episode161_63_82/view0_63.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/put_money_in_safe_episode161_63_82/view1_63.png"
+  ],
+  "geometry_model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "box",
+    "part_geometry": [
+      "lid",
+      "body"
+    ],
+    "size": "small",
+    "aspect_ratio": "1x2",
+    "orientation": "horizontal",
+    "front_face_direction": "up",
+    "pose_relation": "on top of",
+    "opening_geometry": "lid",
+    "axis_geometry": "vertical",
+    "symmetry": "none",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "safe",
+      "money"
+    ],
+    "uncertain_fields": [
+      "robot_position",
+      "robot_action"
+    ],
+    "manipulated_object": "money_and_safe",
+    "key_features": [
+      "safe",
+      "rectangular",
+      "hollow",
+      "slot",
+      "front_opening"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction."
+  },
+  "affordance_model": "/data/yf23/checkpoints/ICRA27-ROBOT/robopoint-v1-vicuna-v1.5-13b",
+  "affordance_a_i": {
+    "grasp_affordance": "pinch",
+    "contact_affordance": "insert_object",
+    "motion_affordance": "insert",
+    "support_affordance": "none",
+    "containment_affordance": "slot",
+    "articulation_affordance": "none",
+    "required_contact_region": "thin_object_edge",
+    "preferred_contact_points": [
+      [
+        0.331,
+        0.04
+      ],
+      [
+        0.333,
+        0.1
+      ],
+      [
+        0.333,
+        0.15
+      ],
+      [
+        0.334,
+        0.2
+      ],
+      [
+        0.334,
+        0.242
+      ],
+      [
+        0.334,
+        0.0
+      ]
+    ],
+    "precision_requirement": "high",
+    "force_requirement": "medium",
+    "failure_sensitive_property": "misalignment",
+    "raw_robopoint_text": "[(0.331, 0.040), (0.333, 0.100), (0.333, 0.150), (0.334, 0.200), (0.334, 0.242), (0.334, 0.000)]",
+    "source_note": "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders.",
+    "vision_tower_note": "Pilot run uses the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR because openai/clip-vit-large-patch14-336 PyTorch weights could not be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates."
+  },
+  "source_files": {
+    "geometry_qwen2_5_vl": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/put_money_in_safe_episode161_63_82/geometry_qwen2_5_vl.json",
+    "affordance_robopoint": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/put_money_in_safe_episode161_63_82/affordance_robopoint.json"
+  }
+}

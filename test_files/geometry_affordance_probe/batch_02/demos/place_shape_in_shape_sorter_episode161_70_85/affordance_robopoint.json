@@ -1,0 +1,63 @@
+{
+  "demo_id": "place_shape_in_shape_sorter_episode161_70_85",
+  "task": "place_shape_in_shape_sorter",
+  "language_description": "put the cube in the shape sorter",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/robopoint-v1-vicuna-v1.5-13b",
+  "images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/place_shape_in_shape_sorter_episode161_70_85/view0_70.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/place_shape_in_shape_sorter_episode161_70_85/view1_70.png"
+  ],
+  "affordance_a_i": {
+    "grasp_affordance": "edge_grasp",
+    "contact_affordance": "insert_object",
+    "motion_affordance": "insert",
+    "support_affordance": "none",
+    "containment_affordance": "slot",
+    "articulation_affordance": "none",
+    "required_contact_region": "shape_body",
+    "preferred_contact_points": [
+      [
+        0.3,
+        0.79
+      ],
+      [
+        0.259,
+        0.81
+      ],
+      [
+        0.23,
+        0.827
+      ],
+      [
+        0.269,
+        0.769
+      ],
+      [
+        0.331,
+        0.794
+      ],
+      [
+        0.231,
+        0.785
+      ],
+      [
+        0.3,
+        0.831
+      ]
+    ],
+    "precision_requirement": "high",
+    "force_requirement": "medium",
+    "failure_sensitive_property": "wrong_shape_orientation",
+    "raw_robopoint_text": "[(0.300, 0.790), (0.259, 0.810), (0.230, 0.827), (0.269, 0.769), (0.331, 0.794), (0.231, 0.785), (0.300, 0.831)]",
+    "source_note": "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders.",
+    "vision_tower_note": "Pilot run uses the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR because openai/clip-vit-large-patch14-336 PyTorch weights could not be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates."
+  },
+  "raw_answer_record": {
+    "question_id": "place_shape_in_shape_sorter_episode161_70_85",
+    "prompt": "Task instruction: put the cube in the shape sorter\nFor robot manipulation, identify the best visible contact or grasp affordance points for accomplishing this task. Return several normalized image keypoints as a list of tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region and motion affordance.",
+    "text": "[(0.300, 0.790), (0.259, 0.810), (0.230, 0.827), (0.269, 0.769), (0.331, 0.794), (0.231, 0.785), (0.300, 0.831)]",
+    "answer_id": "nCzGjUscxHmrcjYfxg3qi5",
+    "model_id": "robopoint-v1-vicuna-v1.5-13b",
+    "category": "agnostos_affordance_probe"
+  }
+}

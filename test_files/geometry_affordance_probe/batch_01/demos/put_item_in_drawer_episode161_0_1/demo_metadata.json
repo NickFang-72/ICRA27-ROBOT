@@ -1,0 +1,32 @@
+{
+  "id": "put_item_in_drawer_episode161_0_1",
+  "task": "put_item_in_drawer",
+  "language_description": "put the item in the bottom drawer",
+  "relative_images": [
+    "seen_tasks/put_item_in_drawer/all_variations/episodes/episode161/front_rgb/0.png",
+    "seen_tasks/put_item_in_drawer/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "absolute_images": [
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/put_item_in_drawer/all_variations/episodes/episode161/front_rgb/0.png",
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/put_item_in_drawer/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "images_exist": [
+    true,
+    true
+  ],
+  "conversation": [
+    {
+      "from": "human",
+      "value": "The task description is 'put the item in the bottom drawer'.\nI give you the current multi-view observations <image>\n<image>\n, the current object names and 3D coordinates {'drawer': [62, 39, 57], 'item': [64, 41, 64]}, and the current 7-dof action [[57, 49, 87, 0, 39, 0, 1]].\nWhat should be the next action for the robot?"
+    },
+    {
+      "from": "gpt",
+      "value": "[[57, 49, 87, 0, 39, 0, 1]]"
+    }
+  ],
+  "demo_dir": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_item_in_drawer_episode161_0_1",
+  "review_images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_item_in_drawer_episode161_0_1/0.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_item_in_drawer_episode161_0_1/0.png"
+  ]
+}

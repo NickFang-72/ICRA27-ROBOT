@@ -1,0 +1,32 @@
+{
+  "id": "close_jar_episode161_0_65",
+  "task": "close_jar",
+  "language_description": "close the red jar",
+  "relative_images": [
+    "seen_tasks/close_jar/all_variations/episodes/episode161/front_rgb/0.png",
+    "seen_tasks/close_jar/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "absolute_images": [
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/close_jar/all_variations/episodes/episode161/front_rgb/0.png",
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/close_jar/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "images_exist": [
+    true,
+    true
+  ],
+  "conversation": [
+    {
+      "from": "human",
+      "value": "The task description is 'close the red jar'.\nI give you the current multi-view observations <image>\n<image>\n, the current object names and 3D coordinates {'jar': [56, 73, 23], 'lid': [27, 79, 16]}, and the current 7-dof action [[57, 49, 87, 0, 39, 0, 1]].\nWhat should be the next action for the robot?"
+    },
+    {
+      "from": "gpt",
+      "value": "[[25, 79, 32, 0, 36, 17, 1]]"
+    }
+  ],
+  "demo_dir": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/close_jar_episode161_0_65",
+  "review_images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/close_jar_episode161_0_65/0.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/close_jar_episode161_0_65/0.png"
+  ]
+}

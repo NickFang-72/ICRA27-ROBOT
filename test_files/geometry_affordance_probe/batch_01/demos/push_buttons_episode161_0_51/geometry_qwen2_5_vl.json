@@ -1,0 +1,36 @@
+{
+  "demo_id": "push_buttons_episode161_0_51",
+  "task": "push_buttons",
+  "language_description": "push the maroon button",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "button",
+    "part_geometry": [
+      "maroon"
+    ],
+    "size": "small",
+    "aspect_ratio": "square",
+    "orientation": "upright",
+    "front_face_direction": "forward",
+    "pose_relation": "static",
+    "opening_geometry": "none",
+    "axis_geometry": "none",
+    "symmetry": "none",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "color",
+      "shape"
+    ],
+    "uncertain_fields": [],
+    "key_features": [
+      "button",
+      "round",
+      "small",
+      "raised_surface",
+      "flat_top"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction.",
+    "manipulated_object": "button"
+  },
+  "raw_output": "{\n  \"primary_shape\": \"button\",\n  \"part_geometry\": [\"maroon\"],\n  \"size\": \"small\",\n  \"aspect_ratio\": \"square\",\n  \"orientation\": \"upright\",\n  \"front_face_direction\": \"forward\",\n  \"pose_relation\": \"static\",\n  \"opening_geometry\": \"none\",\n  \"axis_geometry\": \"none\",\n  \"symmetry\": \"none\",\n  \"clearance_geometry\": \"none\",\n  \"task_relevant_geometric_cues\": [\"color\", \"shape\"],\n  \"uncertain_fields\": []\n}"
+}

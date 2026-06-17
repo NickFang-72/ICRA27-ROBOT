@@ -1,0 +1,37 @@
+{
+  "demo_id": "sweep_to_dustpan_of_size_episode161_0_57",
+  "task": "sweep_to_dustpan_of_size",
+  "language_description": "sweep dirt to the tall dustpan",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "rectangular",
+    "part_geometry": [
+      "handle",
+      "dustpan"
+    ],
+    "size": "small",
+    "aspect_ratio": "wide",
+    "orientation": "horizontal",
+    "front_face_direction": "left",
+    "pose_relation": "parallel",
+    "opening_geometry": "open",
+    "axis_geometry": "vertical",
+    "symmetry": "none",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "handle",
+      "dustpan"
+    ],
+    "uncertain_fields": [],
+    "key_features": [
+      "dustpan",
+      "open_container",
+      "thin_edge",
+      "flat_floor",
+      "target_region"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction.",
+    "manipulated_object": "dustpan"
+  },
+  "raw_output": "{\n  \"primary_shape\": \"rectangular\",\n  \"part_geometry\": [\"handle\", \"dustpan\"],\n  \"size\": \"small\",\n  \"aspect_ratio\": \"wide\",\n  \"orientation\": \"horizontal\",\n  \"front_face_direction\": \"left\",\n  \"pose_relation\": \"parallel\",\n  \"opening_geometry\": \"open\",\n  \"axis_geometry\": \"vertical\",\n  \"symmetry\": \"none\",\n  \"clearance_geometry\": \"none\",\n  \"task_relevant_geometric_cues\": [\"handle\", \"dustpan\"],\n  \"uncertain_fields\": []\n}"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "put_money_in_safe_episode161_0_63",
+  "task": "put_money_in_safe",
+  "language_description": "put the money away in the safe on the bottom shelf",
+  "relative_images": [
+    "seen_tasks/put_money_in_safe/all_variations/episodes/episode161/front_rgb/0.png",
+    "seen_tasks/put_money_in_safe/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "absolute_images": [
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/put_money_in_safe/all_variations/episodes/episode161/front_rgb/0.png",
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/put_money_in_safe/all_variations/episodes/episode161/wrist_rgb/0.png"
+  ],
+  "images_exist": [
+    true,
+    true
+  ],
+  "conversation": [
+    {
+      "from": "human",
+      "value": "The task description is 'put the money away in the safe on the bottom shelf'.\nI give you the current multi-view observations <image>\n<image>\n, the current object names and 3D coordinates {'shelf': [50, 32, 44], 'money': [45, 25, 67]}, and the current 7-dof action [[57, 49, 87, 0, 39, 0, 1]].\nWhat should be the next action for the robot?"
+    },
+    {
+      "from": "gpt",
+      "value": "[[28, 29, 65, 0, 46, 69, 1]]"
+    }
+  ],
+  "demo_dir": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_money_in_safe_episode161_0_63",
+  "review_images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_money_in_safe_episode161_0_63/0.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results/demos/put_money_in_safe_episode161_0_63/0.png"
+  ]
+}

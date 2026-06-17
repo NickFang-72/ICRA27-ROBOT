@@ -1,0 +1,51 @@
+{
+  "demo_id": "sweep_to_dustpan_of_size_episode161_57_68",
+  "task": "sweep_to_dustpan_of_size",
+  "language_description": "sweep dirt to the tall dustpan",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/robopoint-v1-vicuna-v1.5-13b",
+  "images": [
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/sweep_to_dustpan_of_size_episode161_57_68/view0_57.png",
+    "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_probe/results_batch_02/demos/sweep_to_dustpan_of_size_episode161_57_68/view1_57.png"
+  ],
+  "affordance_a_i": {
+    "grasp_affordance": "handle_grasp",
+    "contact_affordance": "push_surface",
+    "motion_affordance": "push",
+    "support_affordance": "none",
+    "containment_affordance": "receptacle",
+    "articulation_affordance": "none",
+    "required_contact_region": "sweeping_tool_or_object_side",
+    "preferred_contact_points": [
+      [
+        0.386,
+        0.09
+      ],
+      [
+        0.389,
+        0.131
+      ],
+      [
+        0.388,
+        0.048
+      ],
+      [
+        0.388,
+        0.173
+      ]
+    ],
+    "precision_requirement": "medium",
+    "force_requirement": "medium",
+    "failure_sensitive_property": "missed_receptacle",
+    "raw_robopoint_text": "[(0.386, 0.090), (0.389, 0.131), (0.388, 0.048), (0.388, 0.173)]",
+    "source_note": "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders.",
+    "vision_tower_note": "Pilot run uses the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR because openai/clip-vit-large-patch14-336 PyTorch weights could not be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates."
+  },
+  "raw_answer_record": {
+    "question_id": "sweep_to_dustpan_of_size_episode161_57_68",
+    "prompt": "Task instruction: sweep dirt to the tall dustpan\nFor robot manipulation, identify the best visible contact or grasp affordance points for accomplishing this task. Return several normalized image keypoints as a list of tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region and motion affordance.",
+    "text": "[(0.386, 0.090), (0.389, 0.131), (0.388, 0.048), (0.388, 0.173)]",
+    "answer_id": "Qa65JPsMxjqvWHFqX3EtzS",
+    "model_id": "robopoint-v1-vicuna-v1.5-13b",
+    "category": "agnostos_affordance_probe"
+  }
+}

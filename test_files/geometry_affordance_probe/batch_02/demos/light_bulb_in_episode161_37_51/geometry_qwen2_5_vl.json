@@ -1,0 +1,41 @@
+{
+  "demo_id": "light_bulb_in_episode161_37_51",
+  "task": "light_bulb_in",
+  "language_description": "screw in the red light bulb",
+  "model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "cylinder",
+    "part_geometry": [
+      "red",
+      "light bulb"
+    ],
+    "size": "small",
+    "aspect_ratio": "1:1",
+    "orientation": "vertical",
+    "front_face_direction": "up",
+    "pose_relation": "attached to robot",
+    "opening_geometry": "flat",
+    "axis_geometry": "vertical",
+    "symmetry": "none",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "red color",
+      "light bulb shape"
+    ],
+    "uncertain_fields": [
+      "robot type"
+    ],
+    "manipulated_object": "light_bulb",
+    "key_features": [
+      "light_bulb",
+      "round",
+      "bulb",
+      "threaded_base",
+      "socket",
+      "rotational_axis",
+      "alignment_sensitive"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction."
+  },
+  "raw_output": "{\n  \"primary_shape\": \"cylinder\",\n  \"part_geometry\": [\"red\", \"light bulb\"],\n  \"size\": \"small\",\n  \"aspect_ratio\": \"1:1\",\n  \"orientation\": \"vertical\",\n  \"front_face_direction\": \"up\",\n  \"pose_relation\": \"attached to robot\",\n  \"opening_geometry\": \"flat\",\n  \"axis_geometry\": \"vertical\",\n  \"symmetry\": \"none\",\n  \"clearance_geometry\": \"none\",\n  \"task_relevant_geometric_cues\": [\"red color\", \"light bulb shape\"],\n  \"uncertain_fields\": [\"robot type\"]\n}"
+}
