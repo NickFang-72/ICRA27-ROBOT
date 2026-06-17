@@ -1,0 +1,7 @@
+.pixi
+.vscode
+CoppeliaSim
+data
+!data/train.json
+outputs
+__pycache__
