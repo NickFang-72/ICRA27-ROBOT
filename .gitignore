@@ -29,3 +29,7 @@ dist/
 # Runtime logs
 logs/
 *.log
+
+# Local CAIR transfer runtime state
+test_files/geometry_affordance_probe/*.pid
+test_files/geometry_affordance_probe/*.lock
