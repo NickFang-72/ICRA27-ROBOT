@@ -212,6 +212,56 @@ Important model/data locations:
 
 RoboPoint caveat: the pilot used a local CLIP ViT-L/14 vision tower fallback because the original `openai/clip-vit-large-patch14-336` PyTorch weights could not be fetched through Hugging Face SSL on CAIR. Treat RoboPoint outputs as human-check candidates.
 
+### X-ICM Build Status - 2026-06-17
+
+X-ICM is cloned on CAIR at:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/X-ICM
+```
+
+The active X-ICM conda environment is:
+
+```text
+/data/yf23/conda/envs/zero-shot
+```
+
+This environment currently verifies:
+
+```text
+torch 2.6.0+cu124, CUDA 12.4, torch.cuda.is_available() == True
+PyRep 4.1.0.3
+RLBench 1.2.0
+YARR 0.1
+```
+
+CoppeliaSim 4.1 is linked from an existing CAIR install:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/X-ICM/CoppeliaSim -> /data/yf23/instant_policy_cair/sim/CoppeliaSim
+```
+
+The X-ICM data directory currently has the 18 seen tasks linked:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/X-ICM/data/seen_tasks -> /data/yf23/datasets/ICRA27-ROBOT/seen_tasks
+```
+
+The full unseen-task archive and dynamics-diffusion checkpoint are not complete yet because CAIR resets connections to Hugging Face CAS/Xet hosts. The fallback is the resumable local relay:
+
+```text
+test_files/geometry_affordance_probe/cair_setup_scripts/stream_archives_to_cair_from_local.sh
+```
+
+The relay streams byte ranges from the Mac to CAIR over SSH, then concatenates/extracts:
+
+```text
+/data/yf23/datasets/ICRA27-ROBOT/unseen_tasks.tar
+/data/yf23/checkpoints/ICRA27-ROBOT/dynamics_diffusion.tar
+```
+
+It is slow on the current network path, so the preferred next step is either to run the relay overnight or obtain a CAIR-accessible mirror/direct transfer for the two archives.
+
 ## How This Extends X-ICM
 
 The intended X-ICM prompt should keep dynamics, geometry, and affordance separate:
@@ -258,6 +308,12 @@ Predict the intended next state or key 7D actions.
 ```
 
 The research question is whether adding `g_i/a_i` and `g_j/a_j` improves retrieval and in-context prediction on cross-task manipulation, especially for tasks whose language differs but whose physical structure is similar.
+
+The prepared combined prompt template lives at:
+
+```text
+test_files/geometry_affordance_probe/prompts/xicm_geometry_affordance_prompt.md
+```
 
 ## Next Steps
 

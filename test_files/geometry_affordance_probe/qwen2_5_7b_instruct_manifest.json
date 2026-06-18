@@ -1,0 +1,68 @@
+[
+  {
+    "file": "config.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/config.json",
+    "size": 663,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "generation_config.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/generation_config.json",
+    "size": 243,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "merges.txt",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/merges.txt",
+    "size": 1671839,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "model-00001-of-00004.safetensors",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-00001-of-00004.safetensors",
+    "size": 3945441440,
+    "final_url_host": "us.aws.cdn.hf.co"
+  },
+  {
+    "file": "model-00002-of-00004.safetensors",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-00002-of-00004.safetensors",
+    "size": 3864726352,
+    "final_url_host": "us.aws.cdn.hf.co"
+  },
+  {
+    "file": "model-00003-of-00004.safetensors",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-00003-of-00004.safetensors",
+    "size": 3864726424,
+    "final_url_host": "us.aws.cdn.hf.co"
+  },
+  {
+    "file": "model-00004-of-00004.safetensors",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/model-00004-of-00004.safetensors",
+    "size": 3556377672,
+    "final_url_host": "us.aws.cdn.hf.co"
+  },
+  {
+    "file": "model.safetensors.index.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/model.safetensors.index.json",
+    "size": 27752,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "tokenizer.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/tokenizer.json",
+    "size": 7031645,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "tokenizer_config.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/tokenizer_config.json",
+    "size": 7305,
+    "final_url_host": "huggingface.co"
+  },
+  {
+    "file": "vocab.json",
+    "url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/vocab.json",
+    "size": 2776833,
+    "final_url_host": "huggingface.co"
+  }
+]
