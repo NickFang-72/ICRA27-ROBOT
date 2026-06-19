@@ -1,0 +1,2 @@
+{"demo_id": "close_jar_episode0", "task": "close_jar", "episode_id": 0, "episode_path": "/data/yf23/projects/ICRA27-ROBOT/X-ICM/data/seen_tasks/train/close_jar/all_variations/episodes/episode0", "s_dyn": 0.90}
+{"demo_id": "turn_tap_episode1", "task": "turn_tap", "episode_id": 1, "episode_path": "/data/yf23/projects/ICRA27-ROBOT/X-ICM/data/seen_tasks/train/turn_tap/all_variations/episodes/episode1", "s_dyn": 0.70}

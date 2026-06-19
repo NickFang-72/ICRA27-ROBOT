@@ -1,0 +1,91 @@
+{
+  "demo_id": "place_shape_in_shape_sorter_episode140",
+  "scene_id": "place_shape_in_shape_sorter:episode140",
+  "task": "place_shape_in_shape_sorter",
+  "episode_id": 140,
+  "language_description": "put the cube in the shape sorter",
+  "episode_path": "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/place_shape_in_shape_sorter/all_variations/episodes/episode140",
+  "demo_dir": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache/demos/place_shape_in_shape_sorter/episode140",
+  "images": [
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/place_shape_in_shape_sorter/all_variations/episodes/episode140/front_rgb/0.png",
+    "/data/yf23/datasets/ICRA27-ROBOT/seen_tasks/place_shape_in_shape_sorter/all_variations/episodes/episode140/wrist_rgb/0.png"
+  ],
+  "geometry_model": "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+  "geometry_g_i": {
+    "primary_shape": "cube",
+    "part_geometry": [
+      "small",
+      "regular"
+    ],
+    "size": "small",
+    "aspect_ratio": "1x1",
+    "orientation": "upright",
+    "front_face_direction": "forward",
+    "pose_relation": "static",
+    "opening_geometry": "closed",
+    "axis_geometry": "vertical",
+    "symmetry": "symmetrical",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": [
+      "cube",
+      "shape_sorter"
+    ],
+    "uncertain_fields": [],
+    "manipulated_object": "shape_and_shape_sorter",
+    "key_features": [
+      "shape_sorter",
+      "shape_profile",
+      "slot",
+      "hole",
+      "matching_geometry",
+      "alignment_sensitive"
+    ],
+    "key_features_note": "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction."
+  },
+  "affordance_model": "/data/yf23/checkpoints/ICRA27-ROBOT/robopoint-v1-vicuna-v1.5-13b",
+  "affordance_a_i": {
+    "grasp_affordance": "edge_grasp",
+    "contact_affordance": "insert_object",
+    "motion_affordance": "insert",
+    "support_affordance": "none",
+    "containment_affordance": "slot",
+    "articulation_affordance": "none",
+    "required_contact_region": "shape_body",
+    "preferred_contact_points": [
+      [
+        0.8,
+        0.671
+      ],
+      [
+        0.759,
+        0.671
+      ],
+      [
+        0.833,
+        0.675
+      ],
+      [
+        0.8,
+        0.715
+      ],
+      [
+        0.834,
+        0.721
+      ],
+      [
+        0.728,
+        0.673
+      ]
+    ],
+    "precision_requirement": "high",
+    "force_requirement": "medium",
+    "failure_sensitive_property": "wrong_shape_orientation",
+    "raw_robopoint_text": "[(0.800, 0.671), (0.759, 0.671), (0.833, 0.675), (0.800, 0.715), (0.834, 0.721), (0.728, 0.673)]",
+    "source_note": "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders.",
+    "vision_tower_note": "Pilot/full-cache run may use the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR if openai/clip-vit-large-patch14-336 PyTorch weights cannot be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates."
+  },
+  "source_files": {
+    "geometry_qwen2_5_vl": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache/demos/place_shape_in_shape_sorter/episode140/geometry_qwen2_5_vl.json",
+    "affordance_robopoint": "/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache/demos/place_shape_in_shape_sorter/episode140/affordance_robopoint.json"
+  }
+}

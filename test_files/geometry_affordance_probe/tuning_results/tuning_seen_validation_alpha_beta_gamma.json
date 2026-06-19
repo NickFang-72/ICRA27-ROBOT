@@ -1,0 +1,1549 @@
+{
+  "method": "seen_task_validation_same_task_retrieval_proxy",
+  "leakage_guard": "Uses only the 18 AGNOSTOS seen tasks. Held-out unseen tasks are not loaded or scored.",
+  "split": {
+    "validation_query_rule": "episode_id >= 180",
+    "candidate_rule": "episode_id < 180",
+    "num_queries": 360,
+    "num_candidates": 3240,
+    "top_k": 18
+  },
+  "score_formula": "score(D_i,Q_j)=alpha*S_dyn(D_i,Q_j)+beta*S_geo(g_i,g_j)+gamma*S_aff(a_i,a_j)",
+  "component_notes": {
+    "S_dyn": "Original X-ICM prompt/output diffusion feature dot product, min-max normalized per query.",
+    "S_geo": "Jaccard similarity over normalized geometry descriptor tokens.",
+    "S_aff": "Jaccard similarity over normalized affordance descriptor tokens, with contact point proximity when both sides have points."
+  },
+  "grid_step": 0.05,
+  "best": {
+    "weights": {
+      "alpha": 0.65,
+      "beta": 0.30000000000000004,
+      "gamma": 0.05
+    },
+    "mrr_at_k": 1.0,
+    "recall_at_k": 1.0,
+    "mean_same_task_in_top_k": 18.0,
+    "median_first_positive_rank": 1.0
+  },
+  "baselines": {
+    "dynamic_only": {
+      "weights": {
+        "alpha": 1.0,
+        "beta": 0.0,
+        "gamma": 0.0
+      },
+      "mrr_at_k": 0.9471870490620491,
+      "recall_at_k": 0.9833333333333333,
+      "mean_same_task_in_top_k": 13.475,
+      "median_first_positive_rank": 1.0
+    },
+    "geometry_only": {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 1.0,
+        "gamma": 0.0
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "affordance_only": {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.0,
+        "gamma": 1.0
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "equal": {
+      "weights": {
+        "alpha": 0.3333333333333333,
+        "beta": 0.3333333333333333,
+        "gamma": 0.3333333333333333
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    }
+  },
+  "by_task_best": {
+    "close_jar": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "insert_onto_square_peg": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "light_bulb_in": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "meat_off_grill": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "open_drawer": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "place_cups": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "place_shape_in_shape_sorter": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "place_wine_at_rack_location": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "push_buttons": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "put_groceries_in_cupboard": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "put_item_in_drawer": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "put_money_in_safe": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "reach_and_drag": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "slide_block_to_color_target": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "stack_blocks": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "stack_cups": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "sweep_to_dustpan_of_size": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    "turn_tap": {
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    }
+  },
+  "top_results": [
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.0,
+        "gamma": 1.0
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.05,
+        "gamma": 0.9500000000000001
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.1,
+        "gamma": 0.9
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.15000000000000002,
+        "gamma": 0.8500000000000001
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.2,
+        "gamma": 0.8
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.25,
+        "gamma": 0.75
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.30000000000000004,
+        "gamma": 0.7000000000000001
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.35000000000000003,
+        "gamma": 0.65
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.4,
+        "gamma": 0.6000000000000001
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.45,
+        "gamma": 0.55
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.5,
+        "gamma": 0.5
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.55,
+        "gamma": 0.45
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.6000000000000001,
+        "gamma": 0.4
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.65,
+        "gamma": 0.35000000000000003
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.7000000000000001,
+        "gamma": 0.30000000000000004
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.75,
+        "gamma": 0.25
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.8,
+        "gamma": 0.2
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.8500000000000001,
+        "gamma": 0.15000000000000002
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.9,
+        "gamma": 0.1
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    },
+    {
+      "weights": {
+        "alpha": 0.0,
+        "beta": 0.9500000000000001,
+        "gamma": 0.05
+      },
+      "mrr_at_k": 1.0,
+      "recall_at_k": 1.0,
+      "mean_same_task_in_top_k": 18.0,
+      "median_first_positive_rank": 1.0
+    }
+  ],
+  "examples_best": [
+    {
+      "query_demo_id": "turn_tap_episode197",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode174",
+          "task": "turn_tap",
+          "score": 0.9882567524909973,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode37",
+          "task": "turn_tap",
+          "score": 0.9430802464485168,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode41",
+          "task": "turn_tap",
+          "score": 0.9282851219177246,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode81",
+          "task": "turn_tap",
+          "score": 0.9203335642814636,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode113",
+          "task": "turn_tap",
+          "score": 0.9148117899894714,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode149",
+          "task": "turn_tap",
+          "score": 0.9069628715515137,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode144",
+          "task": "turn_tap",
+          "score": 0.8733745217323303,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode170",
+          "task": "turn_tap",
+          "score": 0.8688827753067017,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode98",
+          "task": "turn_tap",
+          "score": 0.8506662845611572,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode63",
+          "task": "turn_tap",
+          "score": 0.8368473649024963,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode179",
+          "task": "turn_tap",
+          "score": 0.8214427828788757,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode33",
+          "task": "turn_tap",
+          "score": 0.8154674768447876,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode54",
+          "task": "turn_tap",
+          "score": 0.8150192499160767,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode145",
+          "task": "turn_tap",
+          "score": 0.8068932890892029,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode76",
+          "task": "turn_tap",
+          "score": 0.805687427520752,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode166",
+          "task": "turn_tap",
+          "score": 0.8049092292785645,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode105",
+          "task": "turn_tap",
+          "score": 0.8033571243286133,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode137",
+          "task": "turn_tap",
+          "score": 0.7944880723953247,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode194",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode109",
+          "task": "turn_tap",
+          "score": 0.9275596737861633,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode68",
+          "task": "turn_tap",
+          "score": 0.9252576231956482,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode79",
+          "task": "turn_tap",
+          "score": 0.8931708931922913,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode138",
+          "task": "turn_tap",
+          "score": 0.8522396087646484,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode64",
+          "task": "turn_tap",
+          "score": 0.845889151096344,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode134",
+          "task": "turn_tap",
+          "score": 0.8348827958106995,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode45",
+          "task": "turn_tap",
+          "score": 0.8167983293533325,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode84",
+          "task": "turn_tap",
+          "score": 0.8162907361984253,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode8",
+          "task": "turn_tap",
+          "score": 0.8131046891212463,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode33",
+          "task": "turn_tap",
+          "score": 0.8103182315826416,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode115",
+          "task": "turn_tap",
+          "score": 0.8071497678756714,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode137",
+          "task": "turn_tap",
+          "score": 0.8061910271644592,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode30",
+          "task": "turn_tap",
+          "score": 0.8032050728797913,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode170",
+          "task": "turn_tap",
+          "score": 0.8010464906692505,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode25",
+          "task": "turn_tap",
+          "score": 0.7985436916351318,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode126",
+          "task": "turn_tap",
+          "score": 0.7937208414077759,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode160",
+          "task": "turn_tap",
+          "score": 0.7919164299964905,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode80",
+          "task": "turn_tap",
+          "score": 0.7915294170379639,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode193",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode162",
+          "task": "turn_tap",
+          "score": 0.8438138365745544,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode46",
+          "task": "turn_tap",
+          "score": 0.7661629319190979,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode35",
+          "task": "turn_tap",
+          "score": 0.7232851386070251,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode150",
+          "task": "turn_tap",
+          "score": 0.7219599485397339,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode140",
+          "task": "turn_tap",
+          "score": 0.7124441862106323,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode41",
+          "task": "turn_tap",
+          "score": 0.7098729014396667,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode113",
+          "task": "turn_tap",
+          "score": 0.6979696154594421,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode130",
+          "task": "turn_tap",
+          "score": 0.6949430704116821,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode51",
+          "task": "turn_tap",
+          "score": 0.6843417882919312,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode145",
+          "task": "turn_tap",
+          "score": 0.6838831305503845,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode56",
+          "task": "turn_tap",
+          "score": 0.6832920908927917,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode98",
+          "task": "turn_tap",
+          "score": 0.6636772155761719,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode144",
+          "task": "turn_tap",
+          "score": 0.656406819820404,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode87",
+          "task": "turn_tap",
+          "score": 0.6489490270614624,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode63",
+          "task": "turn_tap",
+          "score": 0.6485955119132996,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode29",
+          "task": "turn_tap",
+          "score": 0.647136926651001,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode170",
+          "task": "turn_tap",
+          "score": 0.6321359872817993,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode115",
+          "task": "turn_tap",
+          "score": 0.6320075988769531,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode188",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode124",
+          "task": "turn_tap",
+          "score": 0.8594487309455872,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode150",
+          "task": "turn_tap",
+          "score": 0.8077384233474731,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode57",
+          "task": "turn_tap",
+          "score": 0.7723062038421631,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode32",
+          "task": "turn_tap",
+          "score": 0.7644851207733154,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode98",
+          "task": "turn_tap",
+          "score": 0.7642497420310974,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode162",
+          "task": "turn_tap",
+          "score": 0.7530097961425781,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode140",
+          "task": "turn_tap",
+          "score": 0.7523689866065979,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode11",
+          "task": "turn_tap",
+          "score": 0.751724123954773,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode136",
+          "task": "turn_tap",
+          "score": 0.7501659393310547,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode112",
+          "task": "turn_tap",
+          "score": 0.7348885536193848,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode167",
+          "task": "turn_tap",
+          "score": 0.7308807969093323,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode34",
+          "task": "turn_tap",
+          "score": 0.7286348938941956,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode65",
+          "task": "turn_tap",
+          "score": 0.726351261138916,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode146",
+          "task": "turn_tap",
+          "score": 0.7227641344070435,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode121",
+          "task": "turn_tap",
+          "score": 0.7217998504638672,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode99",
+          "task": "turn_tap",
+          "score": 0.7200372219085693,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode49",
+          "task": "turn_tap",
+          "score": 0.7173703908920288,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode88",
+          "task": "turn_tap",
+          "score": 0.7158904075622559,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode187",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode2",
+          "task": "turn_tap",
+          "score": 0.8484952449798584,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode22",
+          "task": "turn_tap",
+          "score": 0.821345865726471,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode57",
+          "task": "turn_tap",
+          "score": 0.8199310898780823,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode95",
+          "task": "turn_tap",
+          "score": 0.7976337671279907,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode12",
+          "task": "turn_tap",
+          "score": 0.7669358253479004,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode92",
+          "task": "turn_tap",
+          "score": 0.7623205780982971,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode20",
+          "task": "turn_tap",
+          "score": 0.7529037594795227,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode23",
+          "task": "turn_tap",
+          "score": 0.7520743012428284,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode36",
+          "task": "turn_tap",
+          "score": 0.7492993474006653,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode11",
+          "task": "turn_tap",
+          "score": 0.7477269172668457,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode108",
+          "task": "turn_tap",
+          "score": 0.7386348247528076,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode143",
+          "task": "turn_tap",
+          "score": 0.738125205039978,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode55",
+          "task": "turn_tap",
+          "score": 0.732227087020874,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode40",
+          "task": "turn_tap",
+          "score": 0.7308249473571777,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode56",
+          "task": "turn_tap",
+          "score": 0.7304587960243225,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode15",
+          "task": "turn_tap",
+          "score": 0.7249252796173096,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode70",
+          "task": "turn_tap",
+          "score": 0.7202152013778687,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode43",
+          "task": "turn_tap",
+          "score": 0.7156487107276917,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode199",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode162",
+          "task": "turn_tap",
+          "score": 0.8198354840278625,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode46",
+          "task": "turn_tap",
+          "score": 0.7602058053016663,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode35",
+          "task": "turn_tap",
+          "score": 0.7300817966461182,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode130",
+          "task": "turn_tap",
+          "score": 0.7173300385475159,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode150",
+          "task": "turn_tap",
+          "score": 0.7077842950820923,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode98",
+          "task": "turn_tap",
+          "score": 0.7075425982475281,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode140",
+          "task": "turn_tap",
+          "score": 0.7075293660163879,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode41",
+          "task": "turn_tap",
+          "score": 0.7059751152992249,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode113",
+          "task": "turn_tap",
+          "score": 0.6984421014785767,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode144",
+          "task": "turn_tap",
+          "score": 0.6814147233963013,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode56",
+          "task": "turn_tap",
+          "score": 0.6790944933891296,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode145",
+          "task": "turn_tap",
+          "score": 0.6767433881759644,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode51",
+          "task": "turn_tap",
+          "score": 0.6699430346488953,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode11",
+          "task": "turn_tap",
+          "score": 0.6692843437194824,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode108",
+          "task": "turn_tap",
+          "score": 0.6626476049423218,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode48",
+          "task": "turn_tap",
+          "score": 0.6553100943565369,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode37",
+          "task": "turn_tap",
+          "score": 0.6446322798728943,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode149",
+          "task": "turn_tap",
+          "score": 0.6438217759132385,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode184",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode93",
+          "task": "turn_tap",
+          "score": 0.898856520652771,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode144",
+          "task": "turn_tap",
+          "score": 0.8836562633514404,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode166",
+          "task": "turn_tap",
+          "score": 0.8595688939094543,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode173",
+          "task": "turn_tap",
+          "score": 0.8588188886642456,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode41",
+          "task": "turn_tap",
+          "score": 0.8550770282745361,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode113",
+          "task": "turn_tap",
+          "score": 0.8452606797218323,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode56",
+          "task": "turn_tap",
+          "score": 0.8437520265579224,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode37",
+          "task": "turn_tap",
+          "score": 0.842261791229248,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode130",
+          "task": "turn_tap",
+          "score": 0.8417423367500305,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode97",
+          "task": "turn_tap",
+          "score": 0.8405478596687317,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode174",
+          "task": "turn_tap",
+          "score": 0.8196281790733337,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode19",
+          "task": "turn_tap",
+          "score": 0.8140031695365906,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode62",
+          "task": "turn_tap",
+          "score": 0.8133679628372192,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode69",
+          "task": "turn_tap",
+          "score": 0.8130192160606384,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode169",
+          "task": "turn_tap",
+          "score": 0.81113600730896,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode12",
+          "task": "turn_tap",
+          "score": 0.810676634311676,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode29",
+          "task": "turn_tap",
+          "score": 0.8106054663658142,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode118",
+          "task": "turn_tap",
+          "score": 0.8076117038726807,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode189",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode60",
+          "task": "turn_tap",
+          "score": 0.8741143345832825,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode75",
+          "task": "turn_tap",
+          "score": 0.8412992358207703,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode58",
+          "task": "turn_tap",
+          "score": 0.8010844588279724,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode164",
+          "task": "turn_tap",
+          "score": 0.7827008366584778,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode148",
+          "task": "turn_tap",
+          "score": 0.7806193828582764,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode129",
+          "task": "turn_tap",
+          "score": 0.7785775065422058,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode116",
+          "task": "turn_tap",
+          "score": 0.7771654725074768,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode71",
+          "task": "turn_tap",
+          "score": 0.7707211971282959,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode1",
+          "task": "turn_tap",
+          "score": 0.7644951939582825,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode123",
+          "task": "turn_tap",
+          "score": 0.7573290467262268,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode69",
+          "task": "turn_tap",
+          "score": 0.7516168355941772,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode178",
+          "task": "turn_tap",
+          "score": 0.7499169111251831,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode157",
+          "task": "turn_tap",
+          "score": 0.7470003962516785,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode171",
+          "task": "turn_tap",
+          "score": 0.7432906031608582,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode66",
+          "task": "turn_tap",
+          "score": 0.735644519329071,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode4",
+          "task": "turn_tap",
+          "score": 0.7350071668624878,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode90",
+          "task": "turn_tap",
+          "score": 0.7205384969711304,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode135",
+          "task": "turn_tap",
+          "score": 0.7151720523834229,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode183",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode105",
+          "task": "turn_tap",
+          "score": 0.8136083483695984,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode136",
+          "task": "turn_tap",
+          "score": 0.7705583572387695,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode78",
+          "task": "turn_tap",
+          "score": 0.7117496728897095,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode168",
+          "task": "turn_tap",
+          "score": 0.7037925124168396,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode70",
+          "task": "turn_tap",
+          "score": 0.69017094373703,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode154",
+          "task": "turn_tap",
+          "score": 0.6854750514030457,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode34",
+          "task": "turn_tap",
+          "score": 0.6841450333595276,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode32",
+          "task": "turn_tap",
+          "score": 0.6812437772750854,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode146",
+          "task": "turn_tap",
+          "score": 0.6753330826759338,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode163",
+          "task": "turn_tap",
+          "score": 0.6712526679039001,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode179",
+          "task": "turn_tap",
+          "score": 0.6706230640411377,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode124",
+          "task": "turn_tap",
+          "score": 0.6704729795455933,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode98",
+          "task": "turn_tap",
+          "score": 0.6695173978805542,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode35",
+          "task": "turn_tap",
+          "score": 0.6690547466278076,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode11",
+          "task": "turn_tap",
+          "score": 0.6688011288642883,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode76",
+          "task": "turn_tap",
+          "score": 0.6685373187065125,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode93",
+          "task": "turn_tap",
+          "score": 0.6677221059799194,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode46",
+          "task": "turn_tap",
+          "score": 0.666908323764801,
+          "instruction": "turn left tap"
+        }
+      ]
+    },
+    {
+      "query_demo_id": "turn_tap_episode181",
+      "query_instruction": "turn left tap",
+      "top_k": [
+        {
+          "demo_id": "turn_tap_episode136",
+          "task": "turn_tap",
+          "score": 0.8933795690536499,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode11",
+          "task": "turn_tap",
+          "score": 0.8887969851493835,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode128",
+          "task": "turn_tap",
+          "score": 0.8866849541664124,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode175",
+          "task": "turn_tap",
+          "score": 0.8635342717170715,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode21",
+          "task": "turn_tap",
+          "score": 0.8486778736114502,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode124",
+          "task": "turn_tap",
+          "score": 0.8482429385185242,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode52",
+          "task": "turn_tap",
+          "score": 0.8430769443511963,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode146",
+          "task": "turn_tap",
+          "score": 0.8373288512229919,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode32",
+          "task": "turn_tap",
+          "score": 0.8327165842056274,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode82",
+          "task": "turn_tap",
+          "score": 0.8306931257247925,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode30",
+          "task": "turn_tap",
+          "score": 0.8239877223968506,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode96",
+          "task": "turn_tap",
+          "score": 0.8196635246276855,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode43",
+          "task": "turn_tap",
+          "score": 0.8183760643005371,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode0",
+          "task": "turn_tap",
+          "score": 0.8168908953666687,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode56",
+          "task": "turn_tap",
+          "score": 0.8164931535720825,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode34",
+          "task": "turn_tap",
+          "score": 0.814980685710907,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode91",
+          "task": "turn_tap",
+          "score": 0.811935305595398,
+          "instruction": "turn left tap"
+        },
+        {
+          "demo_id": "turn_tap_episode166",
+          "task": "turn_tap",
+          "score": 0.8065248131752014,
+          "instruction": "turn left tap"
+        }
+      ]
+    }
+  ]
+}

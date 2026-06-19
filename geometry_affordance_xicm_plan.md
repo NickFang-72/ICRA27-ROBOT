@@ -76,12 +76,14 @@ a_j = AffordanceVLM(O_j, L_j)
 
 Where:
 
-- `O_i` is the seen observation.
+- `O_i` is the seen current observation used for descriptor extraction.
 - `L_i` is the seen language instruction.
-- `O_j` is the current unseen query observation.
+- `O_j` is the current unseen query observation used for descriptor extraction.
 - `L_j` is the unseen language instruction.
 
 No unseen demonstrations, future observations, or ground-truth unseen trajectories are used.
+
+Prompt rendering is a separate step from descriptor extraction. After top-k retrieval, each retrieved seen demo should be rendered as a sequence of keypoint observations paired with the corresponding 7D action, matching the paper's observation-action demonstration format. The unseen query still provides only its current observation and descriptors.
 
 ## Geometric Descriptor `g`
 
@@ -174,9 +176,15 @@ Where:
 
 The weights `alpha`, `beta`, and `gamma` are tuned only on seen-task validation splits, not on the held-out AGNOSTOS unseen tasks.
 
+Implementation:
+
+- `test_files/geometry_affordance_probe/scripts/score_xicm_geometry_affordance_retrieval.py` ranks top-k seen demos for the geometry/affordance ablation.
+- `test_files/geometry_affordance_probe/scripts/tune_geometry_affordance_weights.py` tunes weights on seen-task validation rows only and rejects non-seen tasks.
+- The vanilla X-ICM `lang_vis.out` baseline remains unchanged.
+
 ## Prompt Format
 
-The in-context prompt should keep geometry and affordance separate:
+The in-context prompt should keep geometry and affordance separate and use top-k retrieved seen demonstrations:
 
 ```text
 Seen demonstration:
@@ -194,7 +202,15 @@ Affordance features a_i:
 - contact should occur away from hinge
 - goal requires door alignment with frame
 
-Key actions:
+Key observation-action trajectory:
+Step 1 observation:
+...
+Step 1 7D action:
+...
+
+Step 2 observation:
+...
+Step 2 7D action:
 ...
 
 Unseen task:
@@ -210,8 +226,10 @@ Affordance features a_j:
 - contact should occur on upper panel
 - goal requires panel aligned against base
 
-Predict the intended next state or key 7D actions.
+Predict the key 7D action sequence. Return only a Python-style list of 7D action lists.
 ```
+
+The refined prompt text explicitly says "You will receive..." and "Your job is..." and clarifies that the unseen query contains only the current/initial observation, task instruction, `g_j`, and `a_j`.
 
 ## Training and Preprocessing
 
@@ -244,7 +262,7 @@ For each unseen AGNOSTOS task:
 2. Extract `g_j` with the Geometry-VLM.
 3. Extract `a_j` with the Affordance-VLM.
 4. Retrieve top-k seen demonstrations using combined dynamics, geometry, and affordance similarity.
-5. Build the X-ICM in-context prompt with retrieved key actions plus `g_i`, `a_i`, `g_j`, and `a_j`.
+5. Build the X-ICM in-context prompt with each retrieved seen demo rendered as `Step k observation -> Step k 7D action`, plus demo-level `g_i`/`a_i` and query-level `g_j`/`a_j`.
 6. Ask the frozen LLM to infer the intended next state, subgoal, or 7D key action sequence.
 7. Use the existing controller/action model to execute or evaluate the predicted actions.
 

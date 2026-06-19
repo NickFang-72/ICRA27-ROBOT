@@ -1,0 +1,11 @@
+{
+  "geometry_g_j": {
+    "manipulated_object": "oven_knob",
+    "key_features": ["knob", "round", "rotational_axis", "front_face"],
+    "part_geometry": ["knob"],
+    "opening_geometry": "none",
+    "axis_geometry": "vertical",
+    "clearance_geometry": "none",
+    "task_relevant_geometric_cues": ["knob", "rotation_axis"]
+  }
+}

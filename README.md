@@ -53,9 +53,19 @@ a_j = AffordanceVLM(O_j, L_j)
 
 Where:
 
-- `O_i` and `O_j` are current observation frames.
+- `O_i` and `O_j` are current observation frames used to compute descriptor caches.
 - `L_i` and `L_j` are language instructions.
 - No future frames, after-states, unseen demonstrations, or unseen ground-truth actions are used.
+
+For prompt-augmented X-ICM, the retrieved seen demonstrations are then rendered in the original paper style as per-key-action trajectories:
+
+```text
+Step 1 observation -> Step 1 7D action
+Step 2 observation -> Step 2 7D action
+...
+```
+
+The unseen query remains only the current observation/instruction plus `g_j` and `a_j`; it never includes unseen future frames or actions.
 
 The retrieval score can then be extended from X-ICM's dynamics retrieval:
 
@@ -67,6 +77,11 @@ score(D_i, Q_j) =
 ```
 
 Weights should be tuned only on seen-task validation splits, not on the 23 AGNOSTOS unseen tasks.
+
+The ablation scorer is separate from the vanilla X-ICM baseline:
+
+- `test_files/geometry_affordance_probe/scripts/score_xicm_geometry_affordance_retrieval.py`
+- `test_files/geometry_affordance_probe/scripts/tune_geometry_affordance_weights.py`
 
 ## Geometry Descriptor
 
@@ -187,6 +202,21 @@ Open these first:
 - `test_files/geometry_affordance_probe/batch_02/review_index.md`
 
 Batch 2 excludes all batch 1 demo IDs. Batch 2 also preserves two uniquely named initial-state views per demo.
+
+Prompt preparation scripts live in:
+
+- `test_files/geometry_affordance_probe/scripts/prepare_xicm_key_action_trajectories.py`
+- `test_files/geometry_affordance_probe/scripts/render_xicm_geometry_affordance_prompt.py`
+
+These are separate from the vanilla X-ICM baseline path.
+
+The full seen-demo cache is complete on CAIR:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache/review_bundle.jsonl
+```
+
+It contains normalized geometry/affordance rows for all 3,600 seen demonstrations.
 
 ## CAIR Setup
 

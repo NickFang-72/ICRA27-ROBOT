@@ -11,17 +11,17 @@ Use this for the prompt-augmented condition after the original X-ICM baseline is
 ```text
 You are a Franka Panda robot with a parallel gripper.
 
-You will receive in-context demonstrations from seen robot manipulation tasks. Each demonstration contains:
+You will receive the top-k retrieved in-context demonstrations from seen robot manipulation tasks. Each seen demonstration contains:
 - a task instruction,
 - a sequence of key action steps,
 - for each key action step, an X-ICM observation text summarizing object names and discretized 3D positions,
-- for each key action step, the next 7D action,
-- geometry features describing task-relevant object shape, parts, openings, axes, and alignment constraints,
-- affordance features describing grasp/contact regions, motion affordances, and likely failure-sensitive properties.
+- for each key action step, the corresponding next 7D action,
+- a geometry description g_i covering task-relevant object shape, parts, openings, axes, and alignment constraints,
+- an affordance description a_i covering grasp/contact regions, motion affordances, and likely failure-sensitive properties.
 
-Then you will receive one unseen task instruction with its current observation, geometry features, and affordance features. Predict the key 7D actions for the unseen task by following the action trends in the demonstrations.
+You will then receive one unseen query. The unseen query contains only the current/initial observation, task instruction, geometry description g_j, and affordance description a_j. It does not contain future observations, after-states, ground-truth actions, or unseen demonstrations.
 
-Use the geometry and affordance features only to choose the most relevant physical analogy: object shape, required contact region, articulation axis, insertion/containment/alignment needs, and motion type. Do not invent objects, future states, or actions that are not supported by the current unseen observation and instruction.
+Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the top-k retrieved seen demonstrations. Use action trends, geometry, and affordances to choose the best physical analogy: object shape, required contact region, articulation axis, insertion/containment/alignment needs, and motion type. Do not invent objects, future states, or actions that are not supported by the current unseen observation and instruction.
 
 Return only a Python-style list of 7D action lists. Do not output explanations, labels, markdown, or any other text.
 ```
@@ -29,11 +29,14 @@ Return only a Python-style list of 7D action lists. Do not output explanations, 
 ## User Prompt Template
 
 ```text
-You are given retrieved seen demonstrations. Each seen demonstration was selected from the AGNOSTOS seen-task training set. Use them as in-context examples for the current unseen task.
+You will receive {{top_k}} top-k retrieved seen demonstrations from the AGNOSTOS seen-task training set. Use all of them as in-context examples for the current unseen query.
+
+Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the retrieved seen demonstrations using action trends, geometry, and affordances.
 
 Important rules:
-- The seen demonstrations include key observation-action trajectories because they are in-context examples.
-- The unseen query includes only the current observation, language instruction, geometry features, and affordance features.
+- Each seen demonstration includes per-key-action observations paired with the corresponding 7D action.
+- Each seen demonstration includes geometry description g_i and affordance description a_i.
+- The unseen query includes only the current/initial observation, task instruction, geometry description g_j, and affordance description a_j.
 - Do not use unseen demonstrations, unseen future frames, unseen ground-truth actions, or after-states.
 - If geometry and affordance conflict with a seen demo's action trend, prioritize the current unseen observation and task instruction.
 - Preserve the X-ICM output format: only a list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].
@@ -165,6 +168,7 @@ Implementation requirements:
 - Treat X-ICM observations as custom text emitted by the dataset renderer, not as valid Python literals. The required parseable output is only the final list of 7D actions.
 - Use `unknown`, `none`, or `[]` for missing descriptor fields instead of changing field order across demonstrations.
 - The geometry and affordance descriptors can stay demo-level unless we later decide to compute step-level descriptors.
+- Keep this prompt-augmented renderer separate from the vanilla X-ICM baseline prompt path.
 
 ## Example Mini Prompt
 
@@ -260,7 +264,8 @@ Predict the key 7D action sequence for the unseen task. Return only a Python-sty
 ## Wiring Notes
 
 - Use this prompt only for the `X-ICM + geometry + affordance` ablation.
-- This template expects per-key-action seen observations. If the current X-ICM code path only provides the first observation for a retrieved demo, extend the demo renderer before using this prompt for evaluation.
+- This template expects per-key-action seen observations. Use `scripts/prepare_xicm_key_action_trajectories.py` to build payloads from retrieved seen episode paths, then `scripts/render_xicm_geometry_affordance_prompt.py` to render/validate the final prompt.
+- The preparation script should run after retrieval chooses top-k seen demonstrations. Retrieval may use cached demo-level `g_i`/`a_i`, but prompt rendering must still include every retrieved demo's `Step k observation` followed by `Step k 7D action`.
 - For `X-ICM + geometry`, omit the affordance blocks but keep the same output rules.
 - For `X-ICM + affordance`, omit the geometry blocks but keep the same output rules.
 - For geometry-only or affordance-only ablations, also use a matching system prompt that does not claim both feature types are present.

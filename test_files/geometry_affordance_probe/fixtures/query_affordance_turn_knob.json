@@ -1,0 +1,13 @@
+{
+  "affordance_a_j": {
+    "grasp_affordance": "knob_grasp",
+    "contact_affordance": "rotate_part",
+    "motion_affordance": "rotate",
+    "containment_affordance": "none",
+    "articulation_affordance": "screw_twist",
+    "required_contact_region": "oven_knob",
+    "preferred_contact_points": [[0.46, 0.52]],
+    "precision_requirement": "medium",
+    "failure_sensitive_property": "wrong_axis"
+  }
+}

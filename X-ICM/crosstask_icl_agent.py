@@ -23,7 +23,19 @@ class CrossTaskICLAgent(Agent):
         self.seed=seed
         self.ranking_method=ranking_method
 
-        self.SYSTEM_PROMPT = "You are a Franka Panda robot with a parallel gripper. We provide you with some demos from some seen tasks, in the format of [task_instruction, observation]>[ 7-dim action_1, 7-dim action_2, ..., 7-dim action_N ]. Then you will receive an unseen task instruction with a new observation, and you need to output a list of 7-dim actions that match the trends in the demos. Do not output anything else."
+        if any(tag in ranking_method for tag in ["geo_aff", ".geo", ".aff"]):
+            self.SYSTEM_PROMPT = (
+                "You are a Franka Panda robot with a parallel gripper. "
+                "You will receive the top-k retrieved in-context demonstrations from seen robot manipulation tasks. "
+                "Each seen demonstration contains a task instruction, per-key-action observations, the corresponding 7D actions, "
+                "and optional geometry/affordance descriptions depending on the ablation. "
+                "You will then receive one unseen query with only its current observation, task instruction, and the same descriptor types. "
+                "Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the retrieved seen demonstrations. "
+                "Do not use future observations, after-states, unseen demonstrations, or ground-truth unseen actions. "
+                "Return only a Python-style list of 7D action lists. Do not output anything else."
+            )
+        else:
+            self.SYSTEM_PROMPT = "You are a Franka Panda robot with a parallel gripper. We provide you with some demos from some seen tasks, in the format of [task_instruction, observation]>[ 7-dim action_1, 7-dim action_2, ..., 7-dim action_N ]. Then you will receive an unseen task instruction with a new observation, and you need to output a list of 7-dim actions that match the trends in the demos. Do not output anything else."
 
 
     def _preprocess(self, obs, step, **kwargs):

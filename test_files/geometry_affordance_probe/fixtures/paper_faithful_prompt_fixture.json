@@ -1,0 +1,94 @@
+{
+  "retrieved_demos": [
+    {
+      "task_instruction": "close the red jar",
+      "geometry_g_i": {
+        "manipulated_object": "jar",
+        "key_features": ["jar", "round", "cylindrical", "hollow", "lid", "rim", "top_opening"],
+        "part_geometry": ["lid", "body"],
+        "opening_geometry": "top",
+        "axis_geometry": "vertical",
+        "clearance_geometry": "none",
+        "task_relevant_geometric_cues": ["lid", "rim", "vertical_axis"]
+      },
+      "affordance_a_i": {
+        "grasp_affordance": "rim_grasp",
+        "contact_affordance": "rotate_part",
+        "motion_affordance": "twist",
+        "containment_affordance": "closed_container",
+        "articulation_affordance": "screw_twist",
+        "required_contact_region": "lid_or_rim",
+        "preferred_contact_points": [[0.49, 0.6], [0.53, 0.59]],
+        "precision_requirement": "medium",
+        "failure_sensitive_property": "wrong_axis"
+      },
+      "steps": [
+        {
+          "observation": "['instruction': close the red jar, {'lid': [42, 51, 73], 'jar': [43, 51, 68]}]",
+          "action": [42, 51, 73, 0, 39, 0, 1]
+        },
+        {
+          "observation": "['instruction': close the red jar, {'lid': [43, 51, 71], 'jar': [43, 51, 68]}]",
+          "action": [43, 51, 70, 0, 39, 12, 0]
+        }
+      ]
+    },
+    {
+      "task_instruction": "turn left tap",
+      "geometry_g_i": {
+        "manipulated_object": "tap",
+        "key_features": ["tap", "handle", "knob", "rotational_axis", "cylindrical"],
+        "part_geometry": ["handle", "base"],
+        "opening_geometry": "none",
+        "axis_geometry": "vertical",
+        "clearance_geometry": "none",
+        "task_relevant_geometric_cues": ["handle", "knob", "rotation_axis"]
+      },
+      "affordance_a_i": {
+        "grasp_affordance": "knob_grasp",
+        "contact_affordance": "rotate_part",
+        "motion_affordance": "rotate",
+        "containment_affordance": "none",
+        "articulation_affordance": "screw_twist",
+        "required_contact_region": "tap_handle_or_knob",
+        "preferred_contact_points": [[0.45, 0.52]],
+        "precision_requirement": "medium",
+        "failure_sensitive_property": "wrong_axis"
+      },
+      "steps": [
+        {
+          "observation": "['instruction': turn left tap, {'tap': [36, 48, 65]}]",
+          "action": [36, 48, 66, 0, 39, 0, 1]
+        },
+        {
+          "observation": "['instruction': turn left tap, {'tap': [36, 48, 65]}]",
+          "action": [36, 48, 66, 0, 39, 18, 0]
+        }
+      ]
+    }
+  ],
+  "query": {
+    "task_instruction": "turn oven on",
+    "observation": "['instruction': turn oven on, {'oven_knob': [39, 50, 70]}]",
+    "geometry_g_j": {
+      "manipulated_object": "oven_knob",
+      "key_features": ["knob", "round", "rotational_axis", "front_face"],
+      "part_geometry": ["knob"],
+      "opening_geometry": "none",
+      "axis_geometry": "front_normal",
+      "clearance_geometry": "none",
+      "task_relevant_geometric_cues": ["knob", "rotation_axis"]
+    },
+    "affordance_a_j": {
+      "grasp_affordance": "knob_grasp",
+      "contact_affordance": "rotate_part",
+      "motion_affordance": "rotate",
+      "containment_affordance": "none",
+      "articulation_affordance": "screw_twist",
+      "required_contact_region": "oven_knob",
+      "preferred_contact_points": [],
+      "precision_requirement": "medium",
+      "failure_sensitive_property": "wrong_axis"
+    }
+  }
+}
