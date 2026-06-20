@@ -61,6 +61,441 @@ AFFORDANCE_FIELDS = [
     "failure_sensitive_property",
 ]
 
+PROFILE_FIELDS = [
+    "interaction_family",
+    "motion_sequence",
+    "contact_strategy",
+    "target_relation",
+    "axis_constraint",
+    "articulation_model",
+    "precision_driver",
+    "transfer_caution",
+]
+
+PROFILE_FIELD_WEIGHTS = {
+    "interaction_family": 0.22,
+    "motion_sequence": 0.22,
+    "contact_strategy": 0.16,
+    "target_relation": 0.16,
+    "axis_constraint": 0.10,
+    "articulation_model": 0.08,
+    "precision_driver": 0.04,
+    "transfer_caution": 0.02,
+}
+
+TASK_PROFILE_OVERRIDES = {
+    "close_jar": {
+        "interaction_family": "screw_closure",
+        "motion_sequence": "grasp_lid_align_with_rim_twist_about_vertical_axis_release",
+        "contact_strategy": "rim_or_lid_grasp",
+        "target_relation": "lid_seats_on_cylindrical_container_rim",
+        "axis_constraint": "vertical_rotation_axis",
+        "articulation_model": "screw_twist",
+        "precision_driver": "keep_lid_centered_on_jar_rim",
+        "transfer_caution": "not_a_generic_push_or_insert_demo",
+    },
+    "insert_onto_square_peg": {
+        "interaction_family": "ring_to_peg_insertion",
+        "motion_sequence": "grasp_ring_lift_align_hole_to_vertical_peg_lower_release",
+        "contact_strategy": "edge_grasp_on_ring_body",
+        "target_relation": "central_hole_goes_over_spoke_or_peg",
+        "axis_constraint": "vertical_insertion_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "hole_center_alignment",
+        "transfer_caution": "use_for_hole_over_peg_not_for_docking_flat_objects",
+    },
+    "light_bulb_in": {
+        "interaction_family": "threaded_socket_insertion",
+        "motion_sequence": "grasp_bulb_align_base_insert_then_twist",
+        "contact_strategy": "body_or_base_grasp",
+        "target_relation": "threaded_base_enters_socket",
+        "axis_constraint": "socket_rotation_axis",
+        "articulation_model": "insert_then_screw_twist",
+        "precision_driver": "thread_alignment_before_twist",
+        "transfer_caution": "not_a_plain_slot_insertion",
+    },
+    "meat_off_grill": {
+        "interaction_family": "remove_from_support_surface",
+        "motion_sequence": "grasp_object_lift_clear_support_surface",
+        "contact_strategy": "body_grasp",
+        "target_relation": "object_leaves_flat_support_surface",
+        "axis_constraint": "vertical_clearance",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "avoid_dragging_on_grill",
+        "transfer_caution": "not_a_target_placement_demo",
+    },
+    "open_drawer": {
+        "interaction_family": "linear_handle_pull",
+        "motion_sequence": "grasp_handle_pull_along_drawer_axis",
+        "contact_strategy": "handle_grasp",
+        "target_relation": "sliding_container_opens_outward",
+        "axis_constraint": "linear_slide_axis",
+        "articulation_model": "drawer_slide",
+        "precision_driver": "hold_handle_through_pull",
+        "transfer_caution": "good_for_pull_from_slot_or_handle_tasks",
+    },
+    "place_cups": {
+        "interaction_family": "object_to_holder_placement",
+        "motion_sequence": "grasp_cup_lift_align_to_holder_lower_release",
+        "contact_strategy": "cup_body_or_rim_grasp",
+        "target_relation": "cup_sits_or_hangs_on_holder",
+        "axis_constraint": "vertical_placement_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "holder_contact_alignment",
+        "transfer_caution": "closer_to_docking_than_shape_sorter_insertion",
+    },
+    "place_shape_in_shape_sorter": {
+        "interaction_family": "shape_profile_insertion",
+        "motion_sequence": "grasp_shape_lift_match_profile_to_hole_lower_release",
+        "contact_strategy": "edge_grasp_on_shape_body",
+        "target_relation": "shape_profile_passes_through_matching_hole",
+        "axis_constraint": "vertical_insertion_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "shape_orientation_and_hole_match",
+        "transfer_caution": "bad_analogy_for_flat_docking_pull_or_hinge_tasks",
+    },
+    "place_wine_at_rack_location": {
+        "interaction_family": "object_to_rack_placement",
+        "motion_sequence": "grasp_bottle_lift_align_to_rack_location_place_release",
+        "contact_strategy": "bottle_body_or_neck_grasp",
+        "target_relation": "object_resting_in_rack_slot_or_target_location",
+        "axis_constraint": "free_motion_with_rack_alignment",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "target_location_alignment",
+        "transfer_caution": "placement_not_full_insertion",
+    },
+    "push_buttons": {
+        "interaction_family": "button_press",
+        "motion_sequence": "move_to_button_top_press_release",
+        "contact_strategy": "direct_surface_press",
+        "target_relation": "end_effector_contacts_small_button_top",
+        "axis_constraint": "surface_normal_press_axis",
+        "articulation_model": "button_travel",
+        "precision_driver": "button_identity_and_contact_point",
+        "transfer_caution": "good_for_lamp_or_buzzer_press_tasks_only",
+    },
+    "put_groceries_in_cupboard": {
+        "interaction_family": "object_into_open_receptacle",
+        "motion_sequence": "grasp_object_lift_move_to_cupboard_opening_place_release",
+        "contact_strategy": "body_grasp",
+        "target_relation": "object_inside_open_cupboard_or_shelf",
+        "axis_constraint": "free_motion_with_opening_clearance",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "avoid_shelf_collision",
+        "transfer_caution": "placement_into_receptacle_not_slot_insertion",
+    },
+    "put_item_in_drawer": {
+        "interaction_family": "object_into_drawer",
+        "motion_sequence": "grasp_object_lift_move_into_open_drawer_release",
+        "contact_strategy": "body_grasp",
+        "target_relation": "object_inside_open_drawer",
+        "axis_constraint": "free_motion_with_drawer_clearance",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "drawer_opening_clearance",
+        "transfer_caution": "placement_into_container_not_handle_pull",
+    },
+    "put_money_in_safe": {
+        "interaction_family": "thin_object_slot_insertion",
+        "motion_sequence": "pinch_thin_object_align_edge_to_slot_insert_release",
+        "contact_strategy": "pinch_thin_object_edge",
+        "target_relation": "thin_object_enters_safe_slot",
+        "axis_constraint": "slot_insertion_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "thin_edge_slot_alignment",
+        "transfer_caution": "only_good_for_thin_slot_insertion",
+    },
+    "reach_and_drag": {
+        "interaction_family": "tool_drag_to_target",
+        "motion_sequence": "grasp_tool_contact_object_drag_toward_target",
+        "contact_strategy": "tool_handle_grasp_and_object_edge_contact",
+        "target_relation": "object_translates_on_table_to_target_region",
+        "axis_constraint": "planar_drag_axis",
+        "articulation_model": "surface_sliding_contact",
+        "precision_driver": "maintain_tool_object_contact",
+        "transfer_caution": "not_a_pick_and_place_demo",
+    },
+    "slide_block_to_color_target": {
+        "interaction_family": "surface_slide_to_target",
+        "motion_sequence": "contact_block_side_push_or_slide_to_target",
+        "contact_strategy": "surface_push_contact",
+        "target_relation": "object_slides_on_table_to_colored_target",
+        "axis_constraint": "planar_translation_axis",
+        "articulation_model": "surface_sliding_contact",
+        "precision_driver": "target_region_direction",
+        "transfer_caution": "not_for_lift_or_insert_tasks",
+    },
+    "stack_blocks": {
+        "interaction_family": "rigid_object_stacking",
+        "motion_sequence": "grasp_block_lift_align_above_base_block_lower_release",
+        "contact_strategy": "body_grasp",
+        "target_relation": "object_supports_on_top_of_another_object",
+        "axis_constraint": "vertical_stack_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "stable_top_surface_alignment",
+        "transfer_caution": "stacking_not_insertion",
+    },
+    "stack_cups": {
+        "interaction_family": "nested_object_stacking",
+        "motion_sequence": "grasp_cup_lift_align_opening_to_base_cup_lower_release",
+        "contact_strategy": "cup_body_or_rim_grasp",
+        "target_relation": "cup_nests_or_stacks_on_cup",
+        "axis_constraint": "vertical_nesting_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "rim_and_opening_alignment",
+        "transfer_caution": "cup_nesting_not_shape_profile_insertion",
+    },
+    "sweep_to_dustpan_of_size": {
+        "interaction_family": "sweep_into_receptacle",
+        "motion_sequence": "contact_dirt_or_tool_sweep_along_floor_into_dustpan",
+        "contact_strategy": "tool_or_surface_push_contact",
+        "target_relation": "loose_material_enters_dustpan_opening",
+        "axis_constraint": "planar_sweep_axis",
+        "articulation_model": "surface_sliding_contact",
+        "precision_driver": "dustpan_lip_alignment",
+        "transfer_caution": "not_a_grasped_object_placement_demo",
+    },
+    "turn_tap": {
+        "interaction_family": "knob_or_handle_rotation",
+        "motion_sequence": "grasp_knob_or_handle_rotate_about_axis_release",
+        "contact_strategy": "knob_or_handle_grasp",
+        "target_relation": "rotary_control_changes_state",
+        "axis_constraint": "local_rotation_axis",
+        "articulation_model": "rotary_joint",
+        "precision_driver": "rotation_axis_and_direction",
+        "transfer_caution": "good_for_oven_knob_not_for_push_button",
+    },
+    "put_toilet_roll_on_stand": {
+        "interaction_family": "hole_over_vertical_stand",
+        "motion_sequence": "grasp_roll_lift_align_center_hole_to_stand_lower_release",
+        "contact_strategy": "body_grasp",
+        "target_relation": "central_hole_goes_over_vertical_stand",
+        "axis_constraint": "vertical_insertion_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "hole_center_to_stand_axis",
+        "transfer_caution": "hole_over_peg_not_shape_sorter_profile",
+    },
+    "put_knife_on_chopping_board": {
+        "interaction_family": "object_on_flat_surface",
+        "motion_sequence": "grasp_handle_lift_place_on_flat_board_release",
+        "contact_strategy": "handle_grasp",
+        "target_relation": "elongated_object_resting_on_flat_surface",
+        "axis_constraint": "free_motion_to_surface",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "object_orientation_on_board",
+        "transfer_caution": "flat_surface_placement_not_container_insertion",
+    },
+    "close_fridge": {
+        "interaction_family": "hinged_door_close",
+        "motion_sequence": "contact_door_or_handle_push_along_swing_path_until_closed",
+        "contact_strategy": "door_surface_or_handle_contact",
+        "target_relation": "hinged_door_rotates_to_closed_frame",
+        "axis_constraint": "vertical_hinge_axis",
+        "articulation_model": "hinge_open_close",
+        "precision_driver": "push_on_correct_side_of_door",
+        "transfer_caution": "not_a_shape_insert_or_screw_task",
+    },
+    "close_microwave": {
+        "interaction_family": "hinged_door_close",
+        "motion_sequence": "contact_door_or_handle_push_along_swing_path_until_closed",
+        "contact_strategy": "door_surface_or_handle_contact",
+        "target_relation": "hinged_door_rotates_to_closed_frame",
+        "axis_constraint": "vertical_hinge_axis",
+        "articulation_model": "hinge_open_close",
+        "precision_driver": "push_on_outer_door_panel",
+        "transfer_caution": "not_a_shape_insert_or_screw_task",
+    },
+    "close_laptop_lid": {
+        "interaction_family": "hinged_panel_close",
+        "motion_sequence": "contact_lid_edge_or_panel_push_down_about_hinge",
+        "contact_strategy": "panel_edge_or_surface_contact",
+        "target_relation": "flat_panel_rotates_down_to_base",
+        "axis_constraint": "horizontal_hinge_axis",
+        "articulation_model": "hinge_open_close",
+        "precision_driver": "push_on_lid_not_base",
+        "transfer_caution": "not_a_grasped_object_placement_demo",
+    },
+    "phone_on_base": {
+        "interaction_family": "flat_object_docking_place",
+        "motion_sequence": "grasp_phone_body_lift_align_to_base_cradle_lower_release",
+        "contact_strategy": "phone_body_grasp",
+        "target_relation": "flat_phone_rests_on_base_cradle_or_charger",
+        "axis_constraint": "free_motion_with_pose_alignment",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "phone_orientation_to_base_contacts",
+        "transfer_caution": "prefer_holder_or_rack_placement_over_shape_sorter_insertion",
+    },
+    "toilet_seat_down": {
+        "interaction_family": "hinged_panel_close",
+        "motion_sequence": "contact_seat_rim_push_down_about_hinge",
+        "contact_strategy": "rim_or_panel_contact",
+        "target_relation": "seat_rotates_down_to_bowl",
+        "axis_constraint": "horizontal_hinge_axis",
+        "articulation_model": "hinge_open_close",
+        "precision_driver": "contact_moving_seat_not_bowl",
+        "transfer_caution": "not_a_pick_place_or_insert_task",
+    },
+    "lamp_off": {
+        "interaction_family": "button_or_switch_press",
+        "motion_sequence": "move_to_lamp_switch_press_release",
+        "contact_strategy": "direct_surface_press",
+        "target_relation": "small_switch_changes_lamp_state",
+        "axis_constraint": "surface_normal_press_axis",
+        "articulation_model": "button_or_switch_travel",
+        "precision_driver": "switch_identity_and_contact_point",
+        "transfer_caution": "prefer_push_buttons_examples",
+    },
+    "lamp_on": {
+        "interaction_family": "button_or_switch_press",
+        "motion_sequence": "move_to_lamp_switch_press_release",
+        "contact_strategy": "direct_surface_press",
+        "target_relation": "small_switch_changes_lamp_state",
+        "axis_constraint": "surface_normal_press_axis",
+        "articulation_model": "button_or_switch_travel",
+        "precision_driver": "switch_identity_and_contact_point",
+        "transfer_caution": "prefer_push_buttons_examples",
+    },
+    "put_books_on_bookshelf": {
+        "interaction_family": "object_into_shelf",
+        "motion_sequence": "grasp_books_lift_align_to_shelf_opening_insert_or_place_release",
+        "contact_strategy": "book_body_grasp",
+        "target_relation": "books_end_inside_shelf_opening",
+        "axis_constraint": "free_motion_with_shelf_clearance",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "avoid_collision_with_shelf_edges",
+        "transfer_caution": "shelf_placement_not_shape_profile_matching",
+    },
+    "put_umbrella_in_umbrella_stand": {
+        "interaction_family": "elongated_object_into_stand",
+        "motion_sequence": "grasp_umbrella_lift_align_long_axis_to_stand_opening_lower_release",
+        "contact_strategy": "handle_or_body_grasp",
+        "target_relation": "elongated_object_enters_top_open_stand",
+        "axis_constraint": "vertical_insertion_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "long_axis_to_stand_opening",
+        "transfer_caution": "more_like_vertical_receptacle_than_shape_sorter",
+    },
+    "open_grill": {
+        "interaction_family": "hinged_lid_open",
+        "motion_sequence": "grasp_handle_pull_up_about_hinge",
+        "contact_strategy": "handle_grasp",
+        "target_relation": "lid_rotates_open_from_grill_body",
+        "axis_constraint": "horizontal_hinge_axis",
+        "articulation_model": "hinge_open_close",
+        "precision_driver": "hold_lid_handle_through_arc",
+        "transfer_caution": "hinged_handle_motion_not_linear_drawer_pull",
+    },
+    "put_rubbish_in_bin": {
+        "interaction_family": "object_into_open_receptacle",
+        "motion_sequence": "grasp_rubbish_lift_move_over_bin_opening_lower_release",
+        "contact_strategy": "object_body_grasp",
+        "target_relation": "object_inside_top_open_bin",
+        "axis_constraint": "vertical_drop_or_place_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "bin_opening_center",
+        "transfer_caution": "receptacle_placement_not_slot_insertion",
+    },
+    "take_usb_out_of_computer": {
+        "interaction_family": "linear_pull_from_slot",
+        "motion_sequence": "pinch_usb_body_pull_along_port_axis_until_clear",
+        "contact_strategy": "pinch_exposed_connector_body",
+        "target_relation": "inserted_object_exits_slot",
+        "axis_constraint": "linear_port_axis",
+        "articulation_model": "rigid_linear_extraction",
+        "precision_driver": "pull_straight_along_port_axis",
+        "transfer_caution": "prefer_handle_pull_demos_over_insert_demos",
+    },
+    "take_lid_off_saucepan": {
+        "interaction_family": "lift_lid_from_container",
+        "motion_sequence": "grasp_knob_lift_lid_vertically_clear_rim",
+        "contact_strategy": "knob_grasp",
+        "target_relation": "lid_separates_from_pan_rim",
+        "axis_constraint": "vertical_lift_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "grasp_lid_knob",
+        "transfer_caution": "not_a_screw_twist_if_lid_is_loose",
+    },
+    "take_plate_off_colored_dish_rack": {
+        "interaction_family": "remove_flat_object_from_rack",
+        "motion_sequence": "grasp_plate_rim_lift_out_of_rack_clear_slot",
+        "contact_strategy": "rim_grasp",
+        "target_relation": "plate_leaves_rack_slot",
+        "axis_constraint": "free_motion_with_slot_clearance",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "avoid_rack_collision",
+        "transfer_caution": "removal_not_insertion",
+    },
+    "basketball_in_hoop": {
+        "interaction_family": "round_object_into_open_goal",
+        "motion_sequence": "grasp_ball_lift_align_over_hoop_lower_or_release",
+        "contact_strategy": "ball_body_grasp",
+        "target_relation": "ball_center_passes_through_hoop_ring",
+        "axis_constraint": "vertical_goal_axis",
+        "articulation_model": "rigid_free_motion",
+        "precision_driver": "hoop_ring_center",
+        "transfer_caution": "receptacle_goal_not_shape_sorter_profile",
+    },
+    "scoop_with_spatula": {
+        "interaction_family": "tool_scoop_under_object",
+        "motion_sequence": "grasp_spatula_handle_slide_blade_under_object_lift_or_carry",
+        "contact_strategy": "tool_handle_grasp_blade_contact",
+        "target_relation": "thin_blade_goes_under_target_object",
+        "axis_constraint": "shallow_planar_approach_then_lift",
+        "articulation_model": "tool_object_contact",
+        "precision_driver": "blade_edge_under_object",
+        "transfer_caution": "not_a_direct_body_grasp",
+    },
+    "straighten_rope": {
+        "interaction_family": "deformable_drag_straighten",
+        "motion_sequence": "pinch_rope_endpoint_drag_to_reduce_curve",
+        "contact_strategy": "pinch_rope_endpoint_or_body",
+        "target_relation": "deformable_object_changes_shape",
+        "axis_constraint": "planar_drag_axis",
+        "articulation_model": "deformable_contact",
+        "precision_driver": "rope_endpoint_selection",
+        "transfer_caution": "not_a_rigid_pick_place_task",
+    },
+    "turn_oven_on": {
+        "interaction_family": "knob_or_handle_rotation",
+        "motion_sequence": "grasp_or_contact_oven_knob_rotate_about_front_axis",
+        "contact_strategy": "knob_grasp_or_tangent_contact",
+        "target_relation": "rotary_control_changes_oven_state",
+        "axis_constraint": "front_normal_rotation_axis",
+        "articulation_model": "rotary_joint",
+        "precision_driver": "knob_axis_and_rotation_direction",
+        "transfer_caution": "prefer_turn_tap_over_push_button",
+    },
+    "beat_the_buzz": {
+        "interaction_family": "button_or_switch_press",
+        "motion_sequence": "move_to_buzzer_button_press_release",
+        "contact_strategy": "direct_surface_press",
+        "target_relation": "button_top_pressed",
+        "axis_constraint": "surface_normal_press_axis",
+        "articulation_model": "button_travel",
+        "precision_driver": "button_top_center",
+        "transfer_caution": "prefer_push_buttons_examples",
+    },
+    "water_plants": {
+        "interaction_family": "pour_to_target",
+        "motion_sequence": "grasp_watering_can_handle_lift_position_spout_over_plant_tilt_to_pour",
+        "contact_strategy": "handle_grasp",
+        "target_relation": "spout_aims_at_plant_target_region",
+        "axis_constraint": "tilt_axis_with_spout_direction",
+        "articulation_model": "rigid_object_tilt",
+        "precision_driver": "spout_over_plant",
+        "transfer_caution": "weak_seen_analogy_no_seen_pour_task",
+    },
+    "unplug_charger": {
+        "interaction_family": "linear_pull_from_slot",
+        "motion_sequence": "pinch_charger_body_pull_straight_out_from_socket",
+        "contact_strategy": "pinch_exposed_plug_body",
+        "target_relation": "inserted_plug_exits_wall_socket",
+        "axis_constraint": "linear_socket_axis",
+        "articulation_model": "rigid_linear_extraction",
+        "precision_driver": "pull_straight_along_socket_axis",
+        "transfer_caution": "prefer_handle_pull_demos_over_insert_demos",
+    },
+}
+
 UNSEEN_DESCRIPTOR_RULES = {
     "put_toilet_roll_on_stand": {
         "geometry": {"manipulated_object": "toilet_roll_and_stand", "key_features": ["toilet_roll", "cylindrical", "hole", "stand", "vertical_peg", "alignment_sensitive"], "part_geometry": ["roll", "central_hole", "stand"], "opening_geometry": "hole", "axis_geometry": "vertical", "clearance_geometry": "open_path", "task_relevant_geometric_cues": ["central_hole", "stand_peg"]},
@@ -83,8 +518,8 @@ UNSEEN_DESCRIPTOR_RULES = {
         "affordance": {"grasp_affordance": "edge_grasp", "contact_affordance": "push_surface", "motion_affordance": "rotate", "containment_affordance": "none", "articulation_affordance": "hinge_open_close", "required_contact_region": "lid_edge_or_panel", "preferred_contact_points": [], "precision_requirement": "medium", "failure_sensitive_property": "wrong_axis"},
     },
     "phone_on_base": {
-        "geometry": {"manipulated_object": "phone_and_base", "key_features": ["phone", "rectangular", "flat", "base", "dock", "alignment_sensitive"], "part_geometry": ["phone_body", "base"], "opening_geometry": "slot", "axis_geometry": "free_motion", "clearance_geometry": "open_path", "task_relevant_geometric_cues": ["base_slot", "phone_alignment"]},
-        "affordance": {"grasp_affordance": "body_grasp", "contact_affordance": "insert_object", "motion_affordance": "place", "containment_affordance": "slot", "articulation_affordance": "none", "required_contact_region": "phone_body", "preferred_contact_points": [], "precision_requirement": "high", "failure_sensitive_property": "misalignment"},
+        "geometry": {"manipulated_object": "phone_and_base", "key_features": ["phone", "rectangular", "flat", "base", "dock", "cradle_contact", "alignment_sensitive"], "part_geometry": ["phone_body", "base_cradle"], "opening_geometry": "support_cradle", "axis_geometry": "free_motion", "clearance_geometry": "open_path", "task_relevant_geometric_cues": ["base_contact_patch", "phone_orientation"]},
+        "affordance": {"grasp_affordance": "body_grasp", "contact_affordance": "lift_and_place", "motion_affordance": "place", "containment_affordance": "support_cradle", "articulation_affordance": "none", "required_contact_region": "phone_body", "preferred_contact_points": [], "precision_requirement": "high", "failure_sensitive_property": "pose_misalignment"},
     },
     "toilet_seat_down": {
         "geometry": {"manipulated_object": "toilet_seat", "key_features": ["seat", "ring", "flat_panel", "hinge", "horizontal_axis", "rotation"], "part_geometry": ["seat", "hinge"], "opening_geometry": "hole", "axis_geometry": "horizontal", "clearance_geometry": "swing_path", "task_relevant_geometric_cues": ["hinge_axis", "seat_ring"]},
@@ -169,9 +604,15 @@ def _include_affordance(ranking_metric):
     return "geo_aff" in ranking_metric or ".aff" in ranking_metric
 
 
+def _is_v2_ranking(ranking_metric):
+    return "v2" in ranking_metric
+
+
 def _augmented_weights(ranking_metric):
     if all(os.environ.get(name) is not None for name in ["XICM_GA_ALPHA", "XICM_GA_BETA", "XICM_GA_GAMMA"]):
         return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), float(os.environ["XICM_GA_GAMMA"])
+    if _is_v2_ranking(ranking_metric):
+        return 0.82, 0.04, 0.04
     if "geo_aff" in ranking_metric:
         return 0.65, 0.30, 0.05
     if ".geo" in ranking_metric:
@@ -179,6 +620,13 @@ def _augmented_weights(ranking_metric):
     if ".aff" in ranking_metric:
         return 0.65, 0.0, 0.35
     return 1.0, 0.0, 0.0
+
+
+def _v2_weights():
+    return (
+        float(os.environ.get("XICM_GA_DELTA", "0.22")),
+        float(os.environ.get("XICM_GA_PENALTY", "0.30")),
+    )
 
 
 def _task_episode_from_path(path):
@@ -288,6 +736,129 @@ def _affordance_similarity(seen_affordance, query_affordance):
     return label_score
 
 
+def _profile_tokens(value):
+    if value is None:
+        return set()
+    if isinstance(value, (list, tuple, set)):
+        tokens = set()
+        for item in value:
+            tokens.update(_profile_tokens(item))
+        return tokens
+    return set(_normalize_token(value))
+
+
+def _interaction_profile(task_key, geometry, affordance):
+    profile = {
+        "interaction_family": geometry.get("manipulated_object", task_key),
+        "motion_sequence": affordance.get("motion_affordance", "unknown"),
+        "contact_strategy": affordance.get("required_contact_region")
+        or affordance.get("contact_affordance")
+        or affordance.get("grasp_affordance")
+        or "unknown",
+        "target_relation": geometry.get("opening_geometry")
+        or affordance.get("containment_affordance")
+        or "unknown",
+        "axis_constraint": geometry.get("axis_geometry", "unknown"),
+        "articulation_model": affordance.get("articulation_affordance", "none"),
+        "precision_driver": affordance.get("failure_sensitive_property")
+        or affordance.get("precision_requirement")
+        or "unknown",
+        "transfer_caution": "descriptor_inferred_profile",
+    }
+    override = TASK_PROFILE_OVERRIDES.get(task_key)
+    if override:
+        profile.update(override)
+    return profile
+
+
+def _profile_value_similarity(seen_value, query_value):
+    seen_tokens = _profile_tokens(seen_value)
+    query_tokens = _profile_tokens(query_value)
+    if not seen_tokens or not query_tokens:
+        return 0.0
+    if seen_tokens == query_tokens:
+        return 1.0
+    overlap = len(seen_tokens & query_tokens) / len(seen_tokens | query_tokens)
+    if overlap > 0:
+        return overlap
+    seen_text = "_".join(sorted(seen_tokens))
+    query_text = "_".join(sorted(query_tokens))
+    if seen_text in query_text or query_text in seen_text:
+        return 0.6
+    return 0.0
+
+
+def _profile_similarity(seen_profile, query_profile):
+    score = 0.0
+    total = 0.0
+    for field, weight in PROFILE_FIELD_WEIGHTS.items():
+        score += weight * _profile_value_similarity(seen_profile.get(field), query_profile.get(field))
+        total += weight
+    if total == 0:
+        return 0.0
+    return score / total
+
+
+def _profile_has(profile, *needles):
+    text = " ".join(str(profile.get(field, "")) for field in PROFILE_FIELDS).lower()
+    return any(needle in text for needle in needles)
+
+
+def _profile_conflict_penalty(seen_profile, query_profile):
+    penalty = 0.0
+
+    if _profile_has(query_profile, "linear_pull_from_slot", "extraction", "pull_straight"):
+        if _profile_has(seen_profile, "insert", "shape_profile", "slot_insertion", "screw_closure"):
+            penalty += 0.40
+        if not _profile_has(seen_profile, "pull", "handle", "drawer"):
+            penalty += 0.10
+
+    if _profile_has(query_profile, "flat_object_docking_place", "phone"):
+        if _profile_has(seen_profile, "shape_profile_insertion", "screw_closure", "thin_object_slot_insertion"):
+            penalty += 0.35
+        if _profile_has(seen_profile, "holder", "rack", "placement", "place"):
+            penalty = max(0.0, penalty - 0.12)
+
+    if _profile_has(query_profile, "hinged_door_close", "hinged_panel_close"):
+        if _profile_has(seen_profile, "shape_profile_insertion", "slot_insertion", "screw_closure"):
+            penalty += 0.35
+        if not _profile_has(seen_profile, "push", "hinge", "surface", "handle"):
+            penalty += 0.10
+
+    if _profile_has(query_profile, "button_or_switch_press"):
+        if not _profile_has(seen_profile, "button", "press", "switch"):
+            penalty += 0.30
+
+    if _profile_has(query_profile, "knob_or_handle_rotation"):
+        if not _profile_has(seen_profile, "rotate", "rotation", "rotary", "twist"):
+            penalty += 0.30
+
+    if _profile_has(query_profile, "pour_to_target"):
+        if not _profile_has(seen_profile, "lift", "place", "handle", "target"):
+            penalty += 0.20
+
+    if _profile_has(query_profile, "object_into_open_receptacle"):
+        if _profile_has(seen_profile, "shape_profile_insertion", "screw_closure", "button"):
+            penalty += 0.25
+
+    return min(1.0, max(0.0, penalty))
+
+
+def _attention_bias_for_ranked_items(ranked):
+    if not ranked:
+        return ranked
+    scores = [item["score"] for item in ranked]
+    low = min(scores)
+    high = max(scores)
+    span = high - low
+    for item in ranked:
+        if span <= 1e-9:
+            item["attention_bias"] = 1.0
+        else:
+            item["attention_bias"] = max(0.0, min(1.0, 0.10 + 0.90 * (item["score"] - low) / span))
+    return ranked
+
+
 def _query_descriptors(task_key, language_goal):
     if task_key in UNSEEN_DESCRIPTOR_RULES:
         item = UNSEEN_DESCRIPTOR_RULES[task_key]
@@ -330,25 +901,54 @@ def _format_feature_block(title, values, fields):
     return "\n".join(lines)
 
 
+def _format_profile_block(title, values):
+    lines = [f"{title}:"]
+    for field in PROFILE_FIELDS:
+        lines.append(f"- {field}: {_format_value(values.get(field, 'unknown'))}")
+    return "\n".join(lines)
+
+
 def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_affordance, ranking_metric, top_k):
     review_cache = _load_augmented_review_cache()
     sim_min = float(np.min(similarity))
     sim_max = float(np.max(similarity))
     sim_span = sim_max - sim_min
     alpha, beta, gamma = _augmented_weights(ranking_metric)
+    delta, penalty_weight = _v2_weights()
+    use_v2 = _is_v2_ranking(ranking_metric)
+    query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
+    query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
     ranked = []
     for idx, demo_path in enumerate(all_demo_paths):
         task, episode_id = _task_episode_from_path(demo_path)
         row = review_cache.get((task, episode_id))
         if row is None:
             continue
+        seen_geometry = row.get("geometry_g_i") or {}
+        seen_affordance = row.get("affordance_a_i") or {}
         s_dyn = 0.0 if sim_span == 0 else (float(similarity[idx]) - sim_min) / sim_span
-        s_geo = _geometry_similarity(row.get("geometry_g_i") or {}, query_geometry)
-        s_aff = _affordance_similarity(row.get("affordance_a_i") or {}, query_affordance)
+        s_geo = _geometry_similarity(seen_geometry, query_geometry)
+        s_aff = _affordance_similarity(seen_affordance, query_affordance)
+        seen_profile = _interaction_profile(task, seen_geometry, seen_affordance)
+        s_profile = _profile_similarity(seen_profile, query_profile)
+        penalty = _profile_conflict_penalty(seen_profile, query_profile) if use_v2 else 0.0
         score = alpha * s_dyn + beta * s_geo + gamma * s_aff
-        ranked.append((score, idx, s_dyn, s_geo, s_aff))
-    ranked.sort(reverse=True, key=lambda item: item[0])
-    return ranked[:top_k]
+        if use_v2:
+            score += delta * s_profile - penalty_weight * penalty
+        ranked.append(
+            {
+                "score": score,
+                "index": idx,
+                "s_dyn": s_dyn,
+                "s_geo": s_geo,
+                "s_aff": s_aff,
+                "s_profile": s_profile,
+                "penalty": penalty,
+                "seen_profile": seen_profile,
+            }
+        )
+    ranked.sort(reverse=True, key=lambda item: item["score"])
+    return _attention_bias_for_ranked_items(ranked[:top_k])
 
 class base_task_handler:
     def __init__(self, sim_name_to_real_name):
@@ -387,6 +987,8 @@ class base_task_handler:
 
             if _is_augmented_ranking(ranking_metric):
                 query_geometry, query_affordance = _query_descriptors(type(self).__name__, taskname)
+                query_geometry = dict(query_geometry)
+                query_geometry["task_key"] = type(self).__name__
                 ranked = _rank_augmented_indices(
                     similarity,
                     all_demo_paths,
@@ -405,6 +1007,7 @@ class base_task_handler:
                     query_affordance,
                     include_geometry=_include_geometry(ranking_metric),
                     include_affordance=_include_affordance(ranking_metric),
+                    use_v2=_is_v2_ranking(ranking_metric),
                 )
 
             top_indices = np.argsort(similarity)[::-1]
@@ -1158,7 +1761,7 @@ def get_stored_demo_key_action_steps(dataset_root, task_name, episode_id, sim_na
     return result
 
 
-def _format_augmented_demo(rank, task_name, episode_id, retrieval_scores, include_geometry, include_affordance):
+def _format_augmented_demo(rank, task_name, episode_id, retrieval_item, include_geometry, include_affordance, use_v2=False):
     review = _load_augmented_review_cache().get((task_name, episode_id), {})
     demo = get_stored_demo_key_action_steps(
         seen_path,
@@ -1171,9 +1774,26 @@ def _format_augmented_demo(rank, task_name, episode_id, retrieval_scores, includ
         f"Seen demonstration {rank}:",
         "Task instruction:",
         demo["task_instruction"],
-        f"Retrieval scores: score={retrieval_scores[0]:.4f}, S_dyn={retrieval_scores[1]:.4f}, S_geo={retrieval_scores[2]:.4f}, S_aff={retrieval_scores[3]:.4f}",
+        (
+            f"Retrieval scores: score={retrieval_item['score']:.4f}, "
+            f"S_dyn={retrieval_item['s_dyn']:.4f}, "
+            f"S_geo={retrieval_item['s_geo']:.4f}, "
+            f"S_aff={retrieval_item['s_aff']:.4f}, "
+            f"S_profile={retrieval_item['s_profile']:.4f}, "
+            f"transfer_penalty={retrieval_item['penalty']:.4f}"
+        ),
         "",
     ]
+    if use_v2:
+        lines.extend(
+            [
+                f"Attention bias: {retrieval_item.get('attention_bias', 1.0):.2f}",
+                "Use this demo as a primary analogy only if its attention bias is high; use low-bias demos only as weak fallback context.",
+                "",
+                _format_profile_block("Precise interaction signature p_i", retrieval_item.get("seen_profile", {})),
+                "",
+            ]
+        )
     if include_geometry:
         lines.extend([_format_feature_block("Geometry description g_i", review.get("geometry_g_i") or {}, GEOMETRY_FIELDS), ""])
     if include_affordance:
@@ -1203,7 +1823,9 @@ def _format_augmented_user_prompt(
     query_affordance,
     include_geometry=True,
     include_affordance=True,
+    use_v2=False,
 ):
+    query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
     lines = [
         f"You will receive {len(ranked)} top-k retrieved seen demonstrations from the AGNOSTOS seen-task training set. Use all of them as in-context examples for the current unseen query.",
         "",
@@ -1214,20 +1836,30 @@ def _format_augmented_user_prompt(
         "- The unseen query includes only the current/initial observation, task instruction, and the descriptor types used by this ablation.",
         "- Do not use unseen demonstrations, unseen future frames, unseen ground-truth actions, or after-states.",
         "- Preserve the X-ICM output format: only a list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].",
-        "",
     ]
+    if use_v2:
+        lines.extend(
+            [
+                "- Each seen demonstration has an Attention bias from 0.00 to 1.00.",
+                "- Treat demos with attention bias >= 0.75 as primary analogies, demos from 0.40 to 0.75 as supporting evidence, and demos below 0.40 as weak fallback context.",
+                "- If a low-bias demo conflicts with the unseen query or a high-bias demo, ignore the low-bias action trend.",
+                "- Use the precise interaction signatures to distinguish similar words with different mechanics, such as docking vs shape insertion, hinged pushing vs slot insertion, and pulling out vs putting in.",
+            ]
+        )
+    lines.append("")
 
     for rank, item in enumerate(ranked, start=1):
-        score, selected_idx, s_dyn, s_geo, s_aff = item
+        selected_idx = item["index"]
         task_name, episode_id = _task_episode_from_path(all_demo_paths[selected_idx])
         lines.extend([
             _format_augmented_demo(
                 rank,
                 task_name,
                 episode_id,
-                (score, s_dyn, s_geo, s_aff),
+                item,
                 include_geometry,
                 include_affordance,
+                use_v2=use_v2,
             ),
             "",
         ])
@@ -1247,6 +1879,8 @@ def _format_augmented_user_prompt(
         lines.extend([_format_feature_block("Geometry description g_j", query_geometry, GEOMETRY_FIELDS), ""])
     if include_affordance:
         lines.extend([_format_feature_block("Affordance description a_j", query_affordance, AFFORDANCE_FIELDS), ""])
+    if use_v2:
+        lines.extend([_format_profile_block("Precise interaction signature p_j", query_profile), ""])
     lines.append("Predict the key 7D action sequence for the unseen task. Return only a Python-style list of 7D action lists:")
     return "\n".join(lines)
 

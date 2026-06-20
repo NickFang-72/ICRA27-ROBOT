@@ -9,6 +9,7 @@ This folder contains scripts and review outputs for the X-ICM-style geometry and
 - `scripts/`: CAIR/runtime scripts for sampling, Qwen geometry extraction, RoboPoint affordance extraction, normalization, review index generation, and prompt rendering/preparation.
 - `cair_setup_scripts/`: setup/download runner scripts used on CAIR.
 - `fixtures/`: lightweight local fixtures for prompt-format checks.
+- `ablation_results/`: local copies of completed CAIR benchmark logs plus regenerated score tables.
 
 ## Model Roles
 
@@ -39,6 +40,78 @@ The descriptor batches cache demo-level `geometry_g_i` and `affordance_a_i` from
 - `fixtures/paper_faithful_prompt_fixture.json`: tiny fixture used to check the expected `observation -> 7D action` trajectory shape.
 
 The vanilla X-ICM baseline prompt path remains separate and unchanged.
+
+## V2 Geometry/Affordance Ablation
+
+The first geometry/affordance ablation underperformed because the descriptor scores were too coarse and sometimes pushed retrieval toward bad analogies, such as shape-sorter insertion demos for phone docking or charger unplugging. V2 keeps the original dynamic diffusion/X-ICM score as the main anchor, then uses geometry and affordance as controlled tie-breakers instead of letting primitive descriptor words dominate.
+
+V2 runs under a separate ranking method and result folder:
+
+```text
+lang_vis.out.geo_aff_v2
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.18_test
+```
+
+The v2 score is:
+
+```text
+score = alpha*S_dyn + beta*S_geo + gamma*S_aff + delta*S_profile - penalty_weight*S_penalty
+```
+
+Default v2 weights:
+
+```text
+alpha = 0.82
+beta = 0.04
+gamma = 0.04
+delta = 0.22
+penalty_weight = 0.30
+```
+
+Where:
+
+- `S_dyn` is the original X-ICM dynamic diffusion/prompt-output similarity, min-max normalized per query.
+- `S_geo` is the cached geometry descriptor similarity.
+- `S_aff` is the cached affordance descriptor similarity.
+- `S_profile` compares a derived precise interaction signature: interaction family, motion sequence, contact strategy, target relation, axis constraint, articulation model, and precision driver.
+- `S_penalty` downweights bad transfer analogies, such as insertion demos for pull-out tasks, shape-sorter demos for flat phone docking, and non-button demos for button/switch tasks.
+
+Each retrieved v2 demo also gets a prompt-visible attention score:
+
+```text
+Attention bias: 0.00 to 1.00
+```
+
+The prompt tells the LLM to treat high-bias demos as primary analogies, mid-bias demos as supporting evidence, and low-bias demos as weak fallback context. This is prompt-level attention guidance, not a transformer attention-mask modification.
+
+Launch v2 on CAIR:
+
+```bash
+ssh cair 'cd /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache && nohup bash scripts/run_geometry_affordance_v2_on_cair.sh > logs/run_geometry_affordance_v2.nohup.log 2>&1 & echo pid=$!'
+```
+
+Watch progress from the Mac:
+
+```bash
+ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_ablation_progress_from_local.sh
+```
+
+Pull logs and regenerate the table:
+
+```bash
+bash test_files/geometry_affordance_probe/cair_setup_scripts/pull_xicm_ablation_results_from_cair.sh
+python3 test_files/geometry_affordance_probe/scripts/collect_xicm_ablation_results.py
+```
+
+Final validation, once v2 is complete:
+
+```bash
+python3 test_files/geometry_affordance_probe/scripts/collect_xicm_ablation_results.py --require-complete
+```
+
+## Folder Hygiene
+
+Generated `.DS_Store`, `__pycache__`, `.pyc`, local `.pid`, `.lock`, and runtime `.log` files are ignored or treated as disposable workspace clutter. Do not delete benchmark result CSV/Markdown files, pulled CAIR logs, descriptor caches, or demo data unless a user explicitly asks.
 
 To launch the full seen-demo descriptor cache on CAIR:
 

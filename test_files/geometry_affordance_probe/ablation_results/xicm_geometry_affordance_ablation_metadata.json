@@ -8,47 +8,26 @@
     "original_xicm": null,
     "geometry": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_Qwen2.5.7B.instruct_icl.18_test",
     "affordance": "XICM_Cross.ZS_Ranking.lang_vis.out.aff_Qwen2.5.7B.instruct_icl.18_test",
-    "geometry_affordance": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_Qwen2.5.7B.instruct_icl.18_test"
+    "geometry_affordance": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_Qwen2.5.7B.instruct_icl.18_test",
+    "geometry_affordance_v2": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.18_test"
+  },
+  "paper_runs": {
+    "paper_xicm_7b": "/Users/nicholas/Documents/ICRA27 ROBOT/X-ICM/logs/XICM_Cross.ZS_Ranking.lang_vis.out_Qwen2.5.7B.instruct_icl.18/unseen_summary.txt",
+    "paper_xicm_72b": "/Users/nicholas/Documents/ICRA27 ROBOT/X-ICM/logs/XICM_Cross.ZS_Ranking.lang_vis.out_Qwen2.5.72B.instruct_icl.18/unseen_summary.txt"
   },
   "completed_task_scores": {
     "original_xicm": 23,
     "geometry": 23,
-    "affordance": 0,
-    "geometry_affordance": 0
+    "affordance": 23,
+    "geometry_affordance": 23,
+    "geometry_affordance_v2": 4
   },
   "missing_final_scores": {
     "original_xicm": [],
     "geometry": [],
-    "affordance": [
-      "put_toilet_roll_on_stand",
-      "put_knife_on_chopping_board",
-      "close_fridge",
-      "close_microwave",
-      "close_laptop_lid",
-      "phone_on_base",
-      "toilet_seat_down",
-      "lamp_off",
-      "lamp_on",
-      "put_books_on_bookshelf",
-      "put_umbrella_in_umbrella_stand",
-      "open_grill",
-      "put_rubbish_in_bin",
-      "take_usb_out_of_computer",
-      "take_lid_off_saucepan",
-      "take_plate_off_colored_dish_rack",
-      "basketball_in_hoop",
-      "scoop_with_spatula",
-      "straighten_rope",
-      "turn_oven_on",
-      "beat_the_buzz",
-      "water_plants",
-      "unplug_charger"
-    ],
-    "geometry_affordance": [
-      "put_toilet_roll_on_stand",
-      "put_knife_on_chopping_board",
-      "close_fridge",
-      "close_microwave",
+    "affordance": [],
+    "geometry_affordance": [],
+    "geometry_affordance_v2": [
       "close_laptop_lid",
       "phone_on_base",
       "toilet_seat_down",

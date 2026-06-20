@@ -1,46 +1,35 @@
 # X-ICM Geometry/Affordance Ablation Results
 
-Scores are numeric final success percentages from 25 evaluation episodes per task. Accuracy is score / 100 in the CSV.
+Scores are final success percentages. Paper rows use the mean values from the bundled X-ICM paper result summaries. Blank cells mean that ablation has not produced a strict `Finished ... Final Score` for that task yet. Bold marks the best available score in each task column.
 
 ## Completion
 
 - original_xicm: 23/23 task scores
 - geometry: 23/23 task scores
-- affordance: 0/23 task scores
-- geometry_affordance: 0/23 task scores
+- affordance: 23/23 task scores
+- geometry_affordance: 23/23 task scores
+- geometry_affordance_v2: 4/23 task scores
+
+## Task Scores
+
+| Method | put_toilet_roll_on_stand | put_knife_on_chopping_board | close_fridge | close_microwave | close_laptop_lid | phone_on_base | toilet_seat_down | lamp_off | lamp_on | put_books_on_bookshelf | put_umbrella_in_umbrella_stand | open_grill | put_rubbish_in_bin | take_usb_out_of_computer | take_lid_off_saucepan | take_plate_off_colored_dish_rack | basketball_in_hoop | scoop_with_spatula | straighten_rope | turn_oven_on | beat_the_buzz | water_plants | unplug_charger |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| X-ICM 7B (paper) | 1.33 | 26.67 | 22.67 | 45.33 | 33.33 | 57.33 | 48 | 58.67 | 50.67 | 1.33 | 0 | 8 | **18.67** | **98.67** | **20** | **6.67** | 9.33 | 0 | 6.67 | 16 | 2.67 | 5.33 | 4 |
+| X-ICM 72B (paper) | **6.67** | **69.33** | 12.67 | **58.67** | 34 | **68** | 51.33 | **86.67** | 74.67 | 2 | 1.33 | 5.33 | **18.67** | **98.67** | 13.33 | 4.67 | **36** | **0.67** | **16** | 20.67 | **7.33** | 2.67 | 2.67 |
+| X-ICM 7B rerun | 0 | 20 | 20 | 48 | **40** | 56 | 60 | 60 | 40 | 0 | 0 | 4 | 16 | 96 | 16 | 0 | 4 | 0 | 8 | 16 | 0 | 0 | 4 |
+| + geometry | 0 | 8 | 4 | 36 | 32 | 20 | 64 | 84 | 52 | 0 | **4** | 12 | 0 | 88 | 0 | 0 | 0 | 0 | 8 | **40** | 0 | **12** | 0 |
+| + affordance | 0 | 8 | **24** | 56 | 8 | 12 | **76** | 48 | 56 | **4** | 0 | **24** | 0 | 88 | 8 | 0 | 0 | 0 | **16** | 24 | 4 | **12** | **8** |
+| + geometry + affordance | 0 | 16 | 12 | 32 | 28 | 8 | 60 | 76 | **76** | 0 | **4** | **24** | 0 | 96 | 8 | 0 | 0 | 0 | 8 | 28 | 4 | 0 | 0 |
+| + geometry + affordance v2 | 0 | 8 | 8 | 40 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 ## Summary
 
-| task | original_xicm_score | geometry_score | affordance_score | geometry_affordance_score | best_run | best_score | geometry_delta_vs_original | affordance_delta_vs_original | geometry_affordance_delta_vs_original |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| MEAN_ALL | 22.09 | 20.17 |  |  | original_xicm | 22.09 | -1.91 |  |  |
-| MEAN_LEVEL_1 | 28 | 24.31 |  |  | original_xicm | 28 | -3.69 |  |  |
-| MEAN_LEVEL_2 | 14.4 | 14.8 |  |  | geometry | 14.8 | 0.4 |  |  |
-
-## Task Results
-
-| task | original_xicm_score | geometry_score | affordance_score | geometry_affordance_score | best_run | geometry_delta_vs_original | affordance_delta_vs_original | geometry_affordance_delta_vs_original |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| put_toilet_roll_on_stand | 0 | 0 |  |  | original_xicm | 0 |  |  |
-| put_knife_on_chopping_board | 20 | 8 |  |  | original_xicm | -12 |  |  |
-| close_fridge | 20 | 4 |  |  | original_xicm | -16 |  |  |
-| close_microwave | 48 | 36 |  |  | original_xicm | -12 |  |  |
-| close_laptop_lid | 40 | 32 |  |  | original_xicm | -8 |  |  |
-| phone_on_base | 56 | 20 |  |  | original_xicm | -36 |  |  |
-| toilet_seat_down | 60 | 64 |  |  | geometry | 4 |  |  |
-| lamp_off | 60 | 84 |  |  | geometry | 24 |  |  |
-| lamp_on | 40 | 52 |  |  | geometry | 12 |  |  |
-| put_books_on_bookshelf | 0 | 0 |  |  | original_xicm | 0 |  |  |
-| put_umbrella_in_umbrella_stand | 0 | 4 |  |  | geometry | 4 |  |  |
-| open_grill | 4 | 12 |  |  | geometry | 8 |  |  |
-| put_rubbish_in_bin | 16 | 0 |  |  | original_xicm | -16 |  |  |
-| take_usb_out_of_computer | 96 | 88 |  |  | original_xicm | -8 |  |  |
-| take_lid_off_saucepan | 16 | 0 |  |  | original_xicm | -16 |  |  |
-| take_plate_off_colored_dish_rack | 0 | 0 |  |  | original_xicm | 0 |  |  |
-| basketball_in_hoop | 4 | 0 |  |  | original_xicm | -4 |  |  |
-| scoop_with_spatula | 0 | 0 |  |  | original_xicm | 0 |  |  |
-| straighten_rope | 8 | 8 |  |  | original_xicm | 0 |  |  |
-| turn_oven_on | 16 | 40 |  |  | geometry | 24 |  |  |
-| beat_the_buzz | 0 | 0 |  |  | original_xicm | 0 |  |  |
-| water_plants | 0 | 12 |  |  | geometry | 12 |  |  |
-| unplug_charger | 4 | 0 |  |  | original_xicm | -4 |  |  |
+| Method | Level 1 Avg | Level 2 Avg | Average |
+| --- | ---: | ---: | ---: |
+| X-ICM 7B (paper) | 28.62 | 16.93 | 23.54 |
+| X-ICM 72B (paper) | **37.64** | **20.27** | **30.09** |
+| X-ICM 7B rerun | 28 | 14.4 | 22.09 |
+| + geometry | 24.31 | 14.8 | 20.17 |
+| + affordance | 24.31 | 16 | 20.7 |
+| + geometry + affordance | 25.85 | 14.4 | 20.87 |
+| + geometry + affordance v2 | 14 |  | 14 |

@@ -47,10 +47,33 @@ RUNS = {
     "geometry": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_Qwen2.5.7B.instruct_icl.18_test",
     "affordance": "XICM_Cross.ZS_Ranking.lang_vis.out.aff_Qwen2.5.7B.instruct_icl.18_test",
     "geometry_affordance": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_Qwen2.5.7B.instruct_icl.18_test",
+    "geometry_affordance_v2": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.18_test",
+}
+
+PAPER_RUNS = {
+    "paper_xicm_7b": "X-ICM/logs/XICM_Cross.ZS_Ranking.lang_vis.out_Qwen2.5.7B.instruct_icl.18/unseen_summary.txt",
+    "paper_xicm_72b": "X-ICM/logs/XICM_Cross.ZS_Ranking.lang_vis.out_Qwen2.5.72B.instruct_icl.18/unseen_summary.txt",
+}
+
+PAPER_TABLE_COLUMNS = [
+    ("paper_xicm_7b", "X-ICM 7B (paper)"),
+    ("paper_xicm_72b", "X-ICM 72B (paper)"),
+    ("original_xicm", "X-ICM 7B rerun"),
+    ("geometry", "+ geometry"),
+    ("affordance", "+ affordance"),
+    ("geometry_affordance", "+ geometry + affordance"),
+    ("geometry_affordance_v2", "+ geometry + affordance v2"),
+]
+
+SUMMARY_LABELS = {
+    "MEAN_LEVEL_1": "Level 1 Avg",
+    "MEAN_LEVEL_2": "Level 2 Avg",
+    "MEAN_ALL": "Average",
 }
 
 FINAL_SCORE_RE = re.compile(r"Final Score:\s*([0-9]+(?:\.[0-9]+)?)")
 EPISODE_SCORE_RE = re.compile(r"Score:\s*([0-9]+(?:\.[0-9]+)?)\s*\|")
+PAPER_SCORE_RE = re.compile(r"^(.+?):\s*([0-9]+(?:\.[0-9]+)?)")
 
 
 def repo_root() -> Path:
@@ -113,6 +136,33 @@ def load_baseline_scores(path: Path) -> Dict[str, float]:
                 continue
             scores[task] = float(row["score"])
     return scores
+
+
+def load_paper_summary_scores(path: Path) -> Dict[str, float]:
+    scores: Dict[str, float] = {}
+    if not path.exists():
+        return scores
+    for line in path.read_text(errors="replace").splitlines():
+        match = PAPER_SCORE_RE.match(line.strip())
+        if not match:
+            continue
+        label, value = match.group(1), float(match.group(2))
+        if label == "averaged success rate":
+            scores["MEAN_ALL"] = value
+        elif label == "level-1 success rate":
+            scores["MEAN_LEVEL_1"] = value
+        elif label == "level-2 success rate":
+            scores["MEAN_LEVEL_2"] = value
+        else:
+            scores[label] = value
+    return scores
+
+
+def load_paper_scores(root: Path) -> Dict[str, Dict[str, float]]:
+    return {
+        run: load_paper_summary_scores(root / relative_path)
+        for run, relative_path in PAPER_RUNS.items()
+    }
 
 
 def parse_test_data_score(path: Path, allow_partial_episode_mean: bool = False) -> Optional[float]:
@@ -196,7 +246,7 @@ def make_rows(all_scores: Dict[str, Dict[str, Optional[float]]], episodes: int) 
         row["best_run"] = best_run(task_scores)
         row["best_score"] = fmt_score(task_scores.get(row["best_run"])) if row["best_run"] else ""
         base = task_scores.get("original_xicm")
-        for run in ["geometry", "affordance", "geometry_affordance"]:
+        for run in [run for run in RUNS if run != "original_xicm"]:
             score = task_scores[run]
             row[f"{run}_delta_vs_original"] = fmt_score(None if score is None or base is None else score - base)
         rows.append(row)
@@ -220,7 +270,7 @@ def make_rows(all_scores: Dict[str, Dict[str, Optional[float]]], episodes: int) 
         row["best_run"] = best_run(summary_scores)
         row["best_score"] = fmt_score(summary_scores.get(row["best_run"])) if row["best_run"] else ""
         base = summary_scores.get("original_xicm")
-        for run in ["geometry", "affordance", "geometry_affordance"]:
+        for run in [run for run in RUNS if run != "original_xicm"]:
             score = summary_scores[run]
             row[f"{run}_delta_vs_original"] = fmt_score(None if score is None or base is None else score - base)
         rows.append(row)
@@ -244,52 +294,115 @@ def markdown_table(rows: List[Dict[str, str]], fieldnames: List[str]) -> str:
     return "\n".join([header, divider] + body)
 
 
-def write_markdown(path: Path, rows: List[Dict[str, str]], all_scores: Dict[str, Dict[str, Optional[float]]]) -> None:
-    summary_rows = [row for row in rows if row["row_type"] == "summary"]
-    task_rows = [row for row in rows if row["row_type"] == "task"]
-    summary_fields = [
-        "task",
-        "original_xicm_score",
-        "geometry_score",
-        "affordance_score",
-        "geometry_affordance_score",
-        "best_run",
-        "best_score",
-        "geometry_delta_vs_original",
-        "affordance_delta_vs_original",
-        "geometry_affordance_delta_vs_original",
+def paper_style_row_values(
+    key: str,
+    all_scores: Dict[str, Dict[str, Optional[float]]],
+    paper_scores: Dict[str, Dict[str, float]],
+) -> Dict[str, Optional[float]]:
+    values: Dict[str, Optional[float]] = {}
+    for run, _ in PAPER_TABLE_COLUMNS:
+        if run in paper_scores:
+            values[run] = paper_scores[run].get(key)
+        elif key == "MEAN_ALL":
+            values[run] = mean_optional(all_scores[run].get(task) for task in UNSEEN_TASKS)
+        elif key == "MEAN_LEVEL_1":
+            values[run] = mean_optional(all_scores[run].get(task) for task in UNSEEN_TASKS[:13])
+        elif key == "MEAN_LEVEL_2":
+            values[run] = mean_optional(all_scores[run].get(task) for task in UNSEEN_TASKS[13:])
+        else:
+            values[run] = all_scores[run].get(key)
+    return values
+
+
+def bold_best_score(value: Optional[float], best_value: Optional[float]) -> str:
+    text = fmt_score(value)
+    if value is None or best_value is None:
+        return text
+    if abs(value - best_value) < 1e-9:
+        return f"**{text}**"
+    return text
+
+
+def paper_style_markdown_table(
+    keys: List[str],
+    all_scores: Dict[str, Dict[str, Optional[float]]],
+    paper_scores: Dict[str, Dict[str, float]],
+) -> str:
+    best_by_key: Dict[str, Optional[float]] = {}
+    for key in keys:
+        values = paper_style_row_values(key, all_scores, paper_scores)
+        known = [value for value in values.values() if value is not None]
+        best_by_key[key] = max(known) if known else None
+
+    header = ["Method", *[SUMMARY_LABELS.get(key, key) for key in keys]]
+    divider = ["---", *["---:" for _ in keys]]
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join(divider) + " |",
     ]
-    task_fields = [
-        "task",
-        "original_xicm_score",
-        "geometry_score",
-        "affordance_score",
-        "geometry_affordance_score",
-        "best_run",
-        "geometry_delta_vs_original",
-        "affordance_delta_vs_original",
-        "geometry_affordance_delta_vs_original",
-    ]
+    for run, label in PAPER_TABLE_COLUMNS:
+        row = [label]
+        for key in keys:
+            values = paper_style_row_values(key, all_scores, paper_scores)
+            row.append(bold_best_score(values[run], best_by_key[key]))
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def make_score_only_rows(
+    all_scores: Dict[str, Dict[str, Optional[float]]],
+    paper_scores: Dict[str, Dict[str, float]],
+) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    keys = [*UNSEEN_TASKS, "MEAN_LEVEL_1", "MEAN_LEVEL_2", "MEAN_ALL"]
+    for run, label in PAPER_TABLE_COLUMNS:
+        row = {"method": label, "run": run}
+        for key in keys:
+            values = paper_style_row_values(key, all_scores, paper_scores)
+            row[SUMMARY_LABELS.get(key, key)] = fmt_score(values[run])
+        rows.append(row)
+    return rows
+
+
+def write_score_only_csv(path: Path, rows: List[Dict[str, str]]) -> None:
+    fieldnames = list(rows[0].keys())
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_markdown(
+    path: Path,
+    all_scores: Dict[str, Dict[str, Optional[float]]],
+    paper_scores: Dict[str, Dict[str, float]],
+) -> None:
     completed = {
         run: sum(1 for task in UNSEEN_TASKS if all_scores[run].get(task) is not None)
         for run in RUNS
     }
     metadata = "\n".join(f"- {run}: {count}/23 task scores" for run, count in completed.items())
+    summary_keys = ["MEAN_LEVEL_1", "MEAN_LEVEL_2", "MEAN_ALL"]
     text = (
         "# X-ICM Geometry/Affordance Ablation Results\n\n"
-        "Scores are numeric final success percentages from 25 evaluation episodes per task. "
-        "Accuracy is score / 100 in the CSV.\n\n"
+        "Scores are final success percentages. Paper rows use the mean values from the bundled X-ICM paper result summaries. "
+        "Blank cells mean that ablation has not produced a strict `Finished ... Final Score` for that task yet. "
+        "Bold marks the best available score in each task column.\n\n"
         "## Completion\n\n"
         f"{metadata}\n\n"
+        "## Task Scores\n\n"
+        f"{paper_style_markdown_table(UNSEEN_TASKS, all_scores, paper_scores)}\n\n"
         "## Summary\n\n"
-        f"{markdown_table(summary_rows, summary_fields)}\n\n"
-        "## Task Results\n\n"
-        f"{markdown_table(task_rows, task_fields)}\n"
+        f"{paper_style_markdown_table(summary_keys, all_scores, paper_scores)}\n"
     )
     path.write_text(text)
 
 
-def write_metadata(path: Path, args: argparse.Namespace, all_scores: Dict[str, Dict[str, Optional[float]]]) -> None:
+def write_metadata(
+    path: Path,
+    args: argparse.Namespace,
+    all_scores: Dict[str, Dict[str, Optional[float]]],
+) -> None:
     data = {
         "baseline_csv": str(args.baseline_csv),
         "logs_root": str(args.logs_root),
@@ -297,6 +410,10 @@ def write_metadata(path: Path, args: argparse.Namespace, all_scores: Dict[str, D
         "episodes": args.episodes,
         "allow_partial_episode_mean": args.allow_partial_episode_mean,
         "runs": RUNS,
+        "paper_runs": {
+            run: str(repo_root() / relative_path)
+            for run, relative_path in PAPER_RUNS.items()
+        },
         "completed_task_scores": {
             run: sum(1 for task in UNSEEN_TASKS if all_scores[run].get(task) is not None)
             for run in RUNS
@@ -327,13 +444,18 @@ def main() -> None:
         )
 
     rows = make_rows(all_scores, args.episodes)
+    paper_scores = load_paper_scores(repo_root())
+    score_only_rows = make_score_only_rows(all_scores, paper_scores)
     csv_path = args.output_dir / "xicm_geometry_affordance_ablation_wide_table.csv"
+    score_only_csv_path = args.output_dir / "xicm_geometry_affordance_ablation_paper_style_scores.csv"
     md_path = args.output_dir / "xicm_geometry_affordance_ablation_wide_table.md"
     meta_path = args.output_dir / "xicm_geometry_affordance_ablation_metadata.json"
     write_csv(csv_path, rows)
-    write_markdown(md_path, rows, all_scores)
+    write_score_only_csv(score_only_csv_path, score_only_rows)
+    write_markdown(md_path, all_scores, paper_scores)
     write_metadata(meta_path, args, all_scores)
     print(csv_path)
+    print(score_only_csv_path)
     print(md_path)
     print(meta_path)
     if args.require_complete:
