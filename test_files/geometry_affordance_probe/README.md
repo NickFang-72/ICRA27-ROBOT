@@ -41,16 +41,52 @@ The descriptor batches cache demo-level `geometry_g_i` and `affordance_a_i` from
 
 The vanilla X-ICM baseline prompt path remains separate and unchanged.
 
+## Trial Version Map
+
+The trial folders are not physically reorganized yet because v1/v2-related
+files are dirty in the current worktree and a local v2 watcher was active during
+the 2026-06-21 documentation pass. Keep using the method names below as the
+stable version identifiers until the repo is clean and no run/watch process is
+active.
+
+| Version | Ranking method | Demo K | Purpose |
+|---|---|---:|---|
+| v1 | `lang_vis.out.geo_aff` | 18 | First descriptor ablation: combine dynamics with geometry and affordance similarity. |
+| v2 | `lang_vis.out.geo_aff_v2` | 6, 8, 10 | Compact rerun with dynamics-heavy scoring, interaction signatures, transfer penalties, and attention bias. |
+| v3 | `lang_vis.out.geo_aff_v3` | 6 | Contact-mode retrieval with mechanical compatibility, stronger conflict penalties, and diversity caps. |
+
+Short difference between v2 and v3:
+
+- v2 is conservative. It keeps `S_dyn` dominant and uses geometry, affordance,
+  profile similarity, and conflict penalties as tie-breakers.
+- v3 is more mechanical. It gives contact-mode compatibility the same order of
+  influence as dynamics, penalizes known bad analogies harder, and prevents the
+  top-k prompt from being dominated by repeated near-duplicate demos.
+
+As of the latest CAIR check, v2 is complete and v3 is running with `0/23`
+completed remote task CSVs. The active v3 progress file is
+`/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/progress_v3.json`,
+and completed outputs should appear under
+`XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v3_Qwen2.5.7B.instruct_icl.6_test`.
+
 ## V2 Geometry/Affordance Ablation
 
 The first geometry/affordance ablation underperformed because the descriptor scores were too coarse and sometimes pushed retrieval toward bad analogies, such as shape-sorter insertion demos for phone docking or charger unplugging. V2 keeps the original dynamic diffusion/X-ICM score as the main anchor, then uses geometry and affordance as controlled tie-breakers instead of letting primitive descriptor words dominate.
 
-V2 runs under a separate ranking method and result folder:
+V2 runs under a separate ranking method and K-sweep result folders:
 
 ```text
 lang_vis.out.geo_aff_v2
-XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.18_test
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.6_test
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.8_test
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.10_test
 ```
+
+The earlier `icl.18` v2 attempt is intentionally excluded from the generated
+wide table because it failed on a prompt-length overflow. The compact sweep
+keeps the same ranking formula and prompt ideas, but passes fewer top-ranked
+demos to the LLM so the demonstrations are tighter and the prompt stays inside
+the 7B model context window.
 
 The v2 score is:
 
@@ -84,16 +120,16 @@ Attention bias: 0.00 to 1.00
 
 The prompt tells the LLM to treat high-bias demos as primary analogies, mid-bias demos as supporting evidence, and low-bias demos as weak fallback context. This is prompt-level attention guidance, not a transformer attention-mask modification.
 
-Launch v2 on CAIR:
+Launch the compact v2 K sweep on CAIR:
 
 ```bash
-ssh cair 'cd /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache && nohup bash scripts/run_geometry_affordance_v2_on_cair.sh > logs/run_geometry_affordance_v2.nohup.log 2>&1 & echo pid=$!'
+ssh cair 'cd /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache && nohup bash scripts/run_geometry_affordance_v2_k_sweep_on_cair.sh > logs/run_geometry_affordance_v2_k_sweep.nohup.log 2>&1 & echo pid=$!'
 ```
 
 Watch progress from the Mac:
 
 ```bash
-ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_ablation_progress_from_local.sh
+ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_v2_k_sweep_progress_from_local.sh
 ```
 
 Pull logs and regenerate the table:
@@ -103,11 +139,78 @@ bash test_files/geometry_affordance_probe/cair_setup_scripts/pull_xicm_ablation_
 python3 test_files/geometry_affordance_probe/scripts/collect_xicm_ablation_results.py
 ```
 
-Final validation, once v2 is complete:
+Final validation, once the K sweep is complete:
 
 ```bash
 python3 test_files/geometry_affordance_probe/scripts/collect_xicm_ablation_results.py --require-complete
 ```
+
+## V3 Contact-Mode Retrieval
+
+V3 targets the zero-score failure cases from the compact K sweep. It keeps the
+vanilla X-ICM baseline separate, but replaces the coarse descriptor tie-breaker
+with a mechanical compatibility score that compares:
+
+- interaction family/contact mode
+- target relation
+- motion sequence
+- required contact region
+- axis and clearance constraints
+- affordance motion/contact labels
+
+V3 also adds stronger transfer penalties for bad analogies, caps duplicate
+retrievals from the same seen task/family, and adds prompt guidance for
+contact-sensitive tasks such as hole-over-peg placement, shelf insertion, hoop
+release, and spatula scooping.
+
+Current v3 run:
+
+```text
+lang_vis.out.geo_aff_v3
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v3_Qwen2.5.7B.instruct_icl.6_test
+```
+
+Default v3 weights:
+
+```text
+score = alpha*S_dyn + beta*S_geo + gamma*S_aff + delta*S_mech - penalty_weight*S_conflict
+
+alpha = 0.45
+beta = 0.10
+gamma = 0.10
+delta = 0.45
+penalty_weight = 0.60
+max_per_task = 2
+max_per_family = 3
+```
+
+Launch v3 on CAIR:
+
+```bash
+ssh cair 'cd /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache && nohup bash scripts/run_geometry_affordance_v3_on_cair.sh > logs/run_geometry_affordance_v3.nohup.log 2>&1 & echo pid=$!'
+```
+
+Watch progress from the Mac:
+
+```bash
+ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_v3_progress_from_local.sh
+```
+
+## Organization Rule
+
+Do not move, rename, or consolidate trial scripts/results while any of these are
+true:
+
+- `git status --short` shows modified v1/v2 trial files.
+- a local `watch_xicm_*` process is active.
+- CAIR has an active `run_geometry_affordance*`, `eval_XICM.sh`, or `python main.py`
+  process for a trial method.
+
+When the repo is clean and no watcher/evaluator is active, the preferred
+organization is an index-first layout: keep executable scripts in
+`cair_setup_scripts/` for compatibility, and add version-specific docs or
+manifest files pointing to the exact method folders instead of breaking existing
+paths.
 
 ## Folder Hygiene
 

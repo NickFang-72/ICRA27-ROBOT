@@ -1,0 +1,28 @@
+log_message
+Evaluating put_rubbish_in_bin | Episode 0 | Step: 11 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 1 | Step: 11 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 2 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 3 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 4 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 5 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 6 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 7 | Step: 14 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 8 | Step: 8 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 9 | Step: 19 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 10 | Step: 2 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 11 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 12 | Step: 5 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 13 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 14 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 15 | Step: 6 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 16 | Step: 10 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 17 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 18 | Step: 14 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 19 | Step: 2 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 20 | Step: 3 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 21 | Step: 6 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 22 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 23 | Step: 25 | Score: 0.0 | Lang Goal: put rubbish in bin
+Evaluating put_rubbish_in_bin | Episode 24 | Step: 4 | Score: 100.0 | Lang Goal: put rubbish in bin
+Finished put_rubbish_in_bin | Final Score: 4.0
+/data/yf23/projects/ICRA27-ROBOT/X-ICM/logs,4.0,15.6,390

@@ -19,6 +19,31 @@ The project introduces AGNOSTOS, a simulation manipulation benchmark designed to
 
 <img src="docs/agnostos_benchmark.gif" width="100%">
 
+## Local ICRA27 Geometry/Affordance Trials
+
+This checkout is also used by Nicholas's local ICRA27 robot project. The local
+changes are experiment additions on top of X-ICM, not upstream AGNOSTOS release
+instructions. The trial docs live at:
+
+```text
+../README.md
+../test_files/geometry_affordance_probe/README.md
+```
+
+Version summary:
+
+- v1 `lang_vis.out.geo_aff`: first Qwen geometry plus RoboPoint affordance
+  descriptor ablation.
+- v2 `lang_vis.out.geo_aff_v2`: dynamics-heavy rerank with precise interaction
+  signatures, transfer penalties, and prompt-visible attention bias.
+- v3 `lang_vis.out.geo_aff_v3`: contact-mode/mechanical compatibility rerank
+  with stronger penalties, diversity caps, and contact-sensitive prompt guidance.
+
+Do not reorganize scripts or result folders from inside this checkout while a
+watcher/evaluator is active. On 2026-06-21, v2 results were complete and v3 was
+running remotely as `geometry_affordance_v3_k6` with no completed task results
+yet.
+
 ## 🔧 Environment Setup
 
 ### 🐳 Option 1: Using Docker

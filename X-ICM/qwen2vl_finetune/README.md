@@ -2,6 +2,29 @@
 
 This repository contains a script for training [Qwen2-VL](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct) and [Qwen2.5-VL](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct) with only using HuggingFace and [Liger-Kernel](https://github.com/linkedin/Liger-Kernel).
 
+## Local ICRA27 Geometry Role
+
+In Nicholas's ICRA27 robot project, Qwen2.5-VL is used as a geometry descriptor
+extractor for X-ICM retrieval trials, not as the final action policy in the
+current geometry/affordance ablations. The trial docs are:
+
+```text
+../../README.md
+../../test_files/geometry_affordance_probe/README.md
+```
+
+Current version map:
+
+- v1 `lang_vis.out.geo_aff`: Qwen geometry descriptors plus RoboPoint affordance
+  descriptors in retrieval/prompt context.
+- v2 `lang_vis.out.geo_aff_v2`: keeps dynamics dominant and adds precise
+  interaction signatures, attention bias, and transfer penalties.
+- v3 `lang_vis.out.geo_aff_v3`: uses contact-mode/mechanical compatibility,
+  stronger conflict penalties, diversity caps, and contact-mode prompt guidance.
+
+Do not use this submodule README as the source of truth for trial status; use
+the geometry probe README and generated ablation tables.
+
 ## Other projects
 
 **[[Phi3-Vision Finetuning]](https://github.com/2U1/Phi3-Vision-Finetune)**<br>

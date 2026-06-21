@@ -83,6 +83,79 @@ PROFILE_FIELD_WEIGHTS = {
     "transfer_caution": 0.02,
 }
 
+V3_CONTACT_COMPATIBILITY = {
+    "hole_over_vertical_stand": {
+        "ring_to_peg_insertion": 1.00,
+        "threaded_socket_insertion": 0.45,
+        "shape_profile_insertion": 0.30,
+        "nested_object_stacking": 0.20,
+    },
+    "object_into_shelf": {
+        "object_into_open_receptacle": 0.85,
+        "object_into_drawer": 0.75,
+        "object_to_rack_placement": 0.65,
+        "thin_object_slot_insertion": 0.45,
+        "object_to_holder_placement": 0.35,
+        "nested_object_stacking": 0.25,
+    },
+    "round_object_into_open_goal": {
+        "object_into_open_receptacle": 0.85,
+        "sweep_into_receptacle": 0.50,
+        "object_to_holder_placement": 0.35,
+        "nested_object_stacking": 0.30,
+        "rigid_object_stacking": 0.20,
+    },
+    "tool_scoop_under_object": {
+        "sweep_into_receptacle": 0.90,
+        "tool_drag_to_target": 0.85,
+        "surface_slide_to_target": 0.65,
+        "remove_from_support_surface": 0.35,
+    },
+}
+
+V3_FAMILY_GROUPS = [
+    {
+        "hole_over_vertical_stand",
+        "ring_to_peg_insertion",
+        "threaded_socket_insertion",
+    },
+    {
+        "object_into_shelf",
+        "object_into_open_receptacle",
+        "object_into_drawer",
+        "object_to_rack_placement",
+    },
+    {
+        "round_object_into_open_goal",
+        "object_into_open_receptacle",
+        "sweep_into_receptacle",
+    },
+    {
+        "tool_scoop_under_object",
+        "tool_drag_to_target",
+        "sweep_into_receptacle",
+        "surface_slide_to_target",
+    },
+    {
+        "linear_pull_from_slot",
+        "linear_handle_pull",
+        "remove_flat_object_from_rack",
+    },
+    {
+        "hinged_door_close",
+        "hinged_panel_close",
+        "hinged_lid_open",
+    },
+    {
+        "button_or_switch_press",
+        "button_press",
+    },
+    {
+        "knob_or_handle_rotation",
+        "screw_closure",
+    },
+]
+
 TASK_PROFILE_OVERRIDES = {
     "close_jar": {
         "interaction_family": "screw_closure",
@@ -608,9 +681,15 @@ def _is_v2_ranking(ranking_metric):
     return "v2" in ranking_metric
 
 
+def _is_v3_ranking(ranking_metric):
+    return "v3" in ranking_metric
+
+
 def _augmented_weights(ranking_metric):
     if all(os.environ.get(name) is not None for name in ["XICM_GA_ALPHA", "XICM_GA_BETA", "XICM_GA_GAMMA"]):
         return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), float(os.environ["XICM_GA_GAMMA"])
+    if _is_v3_ranking(ranking_metric):
+        return 0.45, 0.10, 0.10
     if _is_v2_ranking(ranking_metric):
         return 0.82, 0.04, 0.04
     if "geo_aff" in ranking_metric:
@@ -622,7 +701,12 @@ def _augmented_weights(ranking_metric):
     return 1.0, 0.0, 0.0
 
 
-def _v2_weights():
+def _profile_weights(ranking_metric):
+    if _is_v3_ranking(ranking_metric):
+        return (
+            float(os.environ.get("XICM_GA_DELTA", "0.45")),
+            float(os.environ.get("XICM_GA_PENALTY", "0.60")),
+        )
     return (
         float(os.environ.get("XICM_GA_DELTA", "0.22")),
         float(os.environ.get("XICM_GA_PENALTY", "0.30")),
@@ -633,6 +717,47 @@ def _task_episode_from_path(path):
     task = path.split("/")[-4]
     episode = int(path.split("/")[-1].replace("episode", "", 1))
     return task, episode
+
+
+def _select_diverse_ranked_items(ranked, top_k):
+    max_per_task = int(os.environ.get("XICM_GA_MAX_PER_TASK", "2"))
+    max_per_family = int(os.environ.get("XICM_GA_MAX_PER_FAMILY", "3"))
+    selected = []
+    task_counts = {}
+    family_counts = {}
+
+    def add_item(item, enforce_task=True, enforce_family=True):
+        task = item.get("task", "")
+        family = _family_name(item.get("seen_profile", {}))
+        if enforce_task and task_counts.get(task, 0) >= max_per_task:
+            return False
+        if enforce_family and family_counts.get(family, 0) >= max_per_family:
+            return False
+        selected.append(item)
+        task_counts[task] = task_counts.get(task, 0) + 1
+        family_counts[family] = family_counts.get(family, 0) + 1
+        return True
+
+    for item in ranked:
+        if len(selected) >= top_k:
+            break
+        add_item(item, enforce_task=True, enforce_family=True)
+
+    for item in ranked:
+        if len(selected) >= top_k:
+            break
+        if item in selected:
+            continue
+        add_item(item, enforce_task=True, enforce_family=False)
+
+    for item in ranked:
+        if len(selected) >= top_k:
+            break
+        if item in selected:
+            continue
+        add_item(item, enforce_task=False, enforce_family=False)
+
+    return selected[:top_k]
 
 
 def _load_augmented_review_cache():
@@ -804,6 +929,56 @@ def _profile_has(profile, *needles):
     return any(needle in text for needle in needles)
 
 
+def _family_name(profile):
+    return str(profile.get("interaction_family", "")).strip().lower()
+
+
+def _contact_family_similarity(seen_profile, query_profile):
+    seen_family = _family_name(seen_profile)
+    query_family = _family_name(query_profile)
+    if not seen_family or not query_family:
+        return 0.0
+    if seen_family == query_family:
+        return 1.0
+
+    compatibility = V3_CONTACT_COMPATIBILITY.get(query_family, {})
+    if seen_family in compatibility:
+        return compatibility[seen_family]
+
+    for group in V3_FAMILY_GROUPS:
+        if seen_family in group and query_family in group:
+            return 0.65
+
+    return 0.35 * _profile_value_similarity(seen_family, query_family)
+
+
+def _field_similarity(a, b, field):
+    return _profile_value_similarity(a.get(field), b.get(field))
+
+
+def _mechanical_similarity(seen_profile, query_profile, seen_geometry, query_geometry, seen_affordance, query_affordance):
+    geometry_score = (
+        0.35 * _field_similarity(seen_geometry, query_geometry, "opening_geometry")
+        + 0.30 * _field_similarity(seen_geometry, query_geometry, "axis_geometry")
+        + 0.20 * _field_similarity(seen_geometry, query_geometry, "clearance_geometry")
+        + 0.15 * _field_similarity(seen_geometry, query_geometry, "part_geometry")
+    )
+    affordance_score = (
+        0.30 * _field_similarity(seen_affordance, query_affordance, "contact_affordance")
+        + 0.30 * _field_similarity(seen_affordance, query_affordance, "motion_affordance")
+        + 0.20 * _field_similarity(seen_affordance, query_affordance, "containment_affordance")
+        + 0.20 * _field_similarity(seen_affordance, query_affordance, "required_contact_region")
+    )
+    profile_score = (
+        0.38 * _contact_family_similarity(seen_profile, query_profile)
+        + 0.20 * _profile_value_similarity(seen_profile.get("target_relation"), query_profile.get("target_relation"))
+        + 0.17 * _profile_value_similarity(seen_profile.get("motion_sequence"), query_profile.get("motion_sequence"))
+        + 0.13 * _profile_value_similarity(seen_profile.get("contact_strategy"), query_profile.get("contact_strategy"))
+        + 0.12 * _profile_value_similarity(seen_profile.get("axis_constraint"), query_profile.get("axis_constraint"))
+    )
+    return max(0.0, min(1.0, 0.55 * profile_score + 0.25 * affordance_score + 0.20 * geometry_score))
+
+
 def _profile_conflict_penalty(seen_profile, query_profile):
     penalty = 0.0
 
@@ -840,6 +1015,36 @@ def _profile_conflict_penalty(seen_profile, query_profile):
     if _profile_has(query_profile, "object_into_open_receptacle"):
         if _profile_has(seen_profile, "shape_profile_insertion", "screw_closure", "button"):
             penalty += 0.25
+
+    return min(1.0, max(0.0, penalty))
+
+
+def _v3_conflict_penalty(seen_profile, query_profile):
+    penalty = _profile_conflict_penalty(seen_profile, query_profile)
+
+    if _profile_has(query_profile, "tool_scoop_under_object", "slide_blade_under", "shallow_planar_approach"):
+        if not _profile_has(seen_profile, "tool", "sweep", "drag", "slide", "surface_sliding_contact"):
+            penalty += 0.55
+        if _profile_has(seen_profile, "screw_closure", "twist", "stack", "shape_profile_insertion", "ring_to_peg"):
+            penalty += 0.25
+
+    if _profile_has(query_profile, "object_into_shelf", "shelf_clearance"):
+        if _profile_has(seen_profile, "object_to_holder_placement", "nested_object_stacking", "cup"):
+            penalty += 0.35
+        if not _profile_has(seen_profile, "shelf", "rack", "drawer", "receptacle", "slot"):
+            penalty += 0.15
+
+    if _profile_has(query_profile, "round_object_into_open_goal", "hoop_ring_center"):
+        if _profile_has(seen_profile, "nested_object_stacking", "rigid_object_stacking"):
+            penalty += 0.35
+        if not _profile_has(seen_profile, "receptacle", "goal", "open", "container", "target"):
+            penalty += 0.15
+
+    if _profile_has(query_profile, "hole_over_vertical_stand", "hole_center_to_stand_axis"):
+        if not _profile_has(seen_profile, "hole", "peg", "spoke", "vertical", "socket"):
+            penalty += 0.35
+        if _profile_has(seen_profile, "shape_profile_insertion"):
+            penalty += 0.12
 
     return min(1.0, max(0.0, penalty))
 
@@ -914,8 +1119,9 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
     sim_max = float(np.max(similarity))
     sim_span = sim_max - sim_min
     alpha, beta, gamma = _augmented_weights(ranking_metric)
-    delta, penalty_weight = _v2_weights()
+    delta, penalty_weight = _profile_weights(ranking_metric)
     use_v2 = _is_v2_ranking(ranking_metric)
+    use_v3 = _is_v3_ranking(ranking_metric)
     query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
     query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
     ranked = []
@@ -930,15 +1136,27 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
         s_geo = _geometry_similarity(seen_geometry, query_geometry)
         s_aff = _affordance_similarity(seen_affordance, query_affordance)
         seen_profile = _interaction_profile(task, seen_geometry, seen_affordance)
-        s_profile = _profile_similarity(seen_profile, query_profile)
-        penalty = _profile_conflict_penalty(seen_profile, query_profile) if use_v2 else 0.0
+        if use_v3:
+            s_profile = _mechanical_similarity(
+                seen_profile,
+                query_profile,
+                seen_geometry,
+                query_geometry,
+                seen_affordance,
+                query_affordance,
+            )
+            penalty = _v3_conflict_penalty(seen_profile, query_profile)
+        else:
+            s_profile = _profile_similarity(seen_profile, query_profile)
+            penalty = _profile_conflict_penalty(seen_profile, query_profile) if use_v2 else 0.0
         score = alpha * s_dyn + beta * s_geo + gamma * s_aff
-        if use_v2:
+        if use_v2 or use_v3:
             score += delta * s_profile - penalty_weight * penalty
         ranked.append(
             {
                 "score": score,
                 "index": idx,
+                "task": task,
                 "s_dyn": s_dyn,
                 "s_geo": s_geo,
                 "s_aff": s_aff,
@@ -948,7 +1166,11 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
             }
         )
     ranked.sort(reverse=True, key=lambda item: item["score"])
-    return _attention_bias_for_ranked_items(ranked[:top_k])
+    if use_v3:
+        ranked = _select_diverse_ranked_items(ranked, top_k)
+    else:
+        ranked = ranked[:top_k]
+    return _attention_bias_for_ranked_items(ranked)
 
 class base_task_handler:
     def __init__(self, sim_name_to_real_name):
@@ -1007,7 +1229,8 @@ class base_task_handler:
                     query_affordance,
                     include_geometry=_include_geometry(ranking_metric),
                     include_affordance=_include_affordance(ranking_metric),
-                    use_v2=_is_v2_ranking(ranking_metric),
+                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric),
+                    use_v3=_is_v3_ranking(ranking_metric),
                 )
 
             top_indices = np.argsort(similarity)[::-1]
@@ -1813,6 +2036,46 @@ def _format_augmented_demo(rank, task_name, episode_id, retrieval_item, include_
     return "\n".join(lines).rstrip()
 
 
+def _v3_action_guidance(query_profile):
+    family = _family_name(query_profile)
+    common = [
+        "V3 contact-mode guidance:",
+        "- Output 3 to 6 key actions when the task requires grasp, move, align, lower, and release phases.",
+        "- The 7th action value is the gripper state and must be binary: 1=open, 0=closed.",
+    ]
+    if family == "hole_over_vertical_stand":
+        common.extend(
+            [
+                "- Required mechanics: grasp the roll body, lift it, align the central hole above the vertical stand or holder axis, lower along that vertical axis, then open/release.",
+                "- Do not treat the stand base as the insertion target; target the vertical holder/peg axis.",
+            ]
+        )
+    elif family == "object_into_shelf":
+        common.extend(
+            [
+                "- Required mechanics: grasp the selected book body, lift it clear, move through the front shelf opening with enough clearance, keep the book oriented for the shelf, then release inside the shelf.",
+                "- Do not copy cup-holder placement unless the action also enters the shelf opening.",
+            ]
+        )
+    elif family == "round_object_into_open_goal":
+        common.extend(
+            [
+                "- Required mechanics: grasp the ball, lift above the hoop, align the ball center over the hoop ring center, then open/release so the ball can pass through the ring.",
+                "- Do not stack the ball on a rim or cup-like surface; the target is the open goal center.",
+            ]
+        )
+    elif family == "tool_scoop_under_object":
+        common.extend(
+            [
+                "- Required mechanics: grasp the spatula handle, keep the blade low, slide the flat blade under the cube, then lift while maintaining tool-object contact.",
+                "- Do not grasp the cube directly and do not use a twisting or stacking action pattern.",
+            ]
+        )
+    else:
+        common.append("- Choose actions that match the query contact mode even if a high-scoring demo has a different action rhythm.")
+    return common
+
+
 def _format_augmented_user_prompt(
     ranked,
     all_demo_paths,
@@ -1824,6 +2087,7 @@ def _format_augmented_user_prompt(
     include_geometry=True,
     include_affordance=True,
     use_v2=False,
+    use_v3=False,
 ):
     query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
     lines = [
@@ -1844,6 +2108,14 @@ def _format_augmented_user_prompt(
                 "- Treat demos with attention bias >= 0.75 as primary analogies, demos from 0.40 to 0.75 as supporting evidence, and demos below 0.40 as weak fallback context.",
                 "- If a low-bias demo conflicts with the unseen query or a high-bias demo, ignore the low-bias action trend.",
                 "- Use the precise interaction signatures to distinguish similar words with different mechanics, such as docking vs shape insertion, hinged pushing vs slot insertion, and pulling out vs putting in.",
+            ]
+        )
+    if use_v3:
+        lines.extend(
+            [
+                "- For v3, prioritize contact-mode compatibility over raw visual/dynamic similarity when they disagree.",
+                "- Prefer demos whose interaction family, target relation, required contact region, and axis constraint match the unseen query.",
+                "- If retrieved demos repeat the same wrong contact mode, use them only as weak coordinate hints.",
             ]
         )
     lines.append("")
@@ -1881,6 +2153,9 @@ def _format_augmented_user_prompt(
         lines.extend([_format_feature_block("Affordance description a_j", query_affordance, AFFORDANCE_FIELDS), ""])
     if use_v2:
         lines.extend([_format_profile_block("Precise interaction signature p_j", query_profile), ""])
+    if use_v3:
+        lines.extend(_v3_action_guidance(query_profile))
+        lines.append("")
     lines.append("Predict the key 7D action sequence for the unseen task. Return only a Python-style list of 7D action lists:")
     return "\n".join(lines)
 

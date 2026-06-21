@@ -9,6 +9,20 @@ The current direction is simple and modular: follow the X-ICM pipeline, but add 
 
 The goal is to test whether X-ICM retrieves better seen demonstrations when the original dynamics similarity is augmented with geometry and affordance similarity.
 
+## Trial Versions
+
+This project now has three geometry/affordance trial lines. They should be kept conceptually separate even when the implementation shares `X-ICM/form_icl_demonstrations_crosstask_ranking.py`.
+
+| Version | Ranking method | Main idea | Current status |
+|---|---|---|---|
+| v1 | `lang_vis.out.geo_aff` | Add Qwen geometry `g_i/g_j` and RoboPoint affordance `a_i/a_j` to retrieval and prompt context. | Completed ablation, average `20.87`; underperformed the original rerun. |
+| v2 | `lang_vis.out.geo_aff_v2` | Keep dynamics similarity as the anchor, add a precise interaction signature, transfer penalties, and prompt-visible attention bias. | Compact K sweep complete for `k=6,8,10`; best average tied at `21.74` for `k=6` and `k=8`. |
+| v3 | `lang_vis.out.geo_aff_v3` | Use contact-mode/mechanical compatibility, stronger conflict penalties, retrieval diversity caps, and explicit contact-mode prompt guidance. | Running on CAIR as `geometry_affordance_v3_k6`; no completed task results yet. |
+
+The important difference between v2 and v3 is the retrieval question. V2 asks whether a seen demo is a mostly dynamics-compatible example with some descriptor/profile tie-breaking. V3 asks whether the seen demo teaches the same physical interaction: contact mode, target relation, motion sequence, required contact region, axis constraint, and clearance.
+
+Directory organization is intentionally postponed as of 2026-06-21. Several v1/v2-related files are already edited in the working tree, and a local v2 watcher was active during this documentation pass. To avoid disturbing running or dirty trial state, do not move, rename, or reorganize trial scripts/logs until the worktree is clean and no watcher/evaluator is active.
+
 ## References
 
 - **AGNOSTOS / X-ICM paper**: [Exploring the Limits of Vision-Language-Action Manipulation in Cross-task Generalization](https://arxiv.org/pdf/2505.15660)
@@ -218,6 +232,18 @@ The full seen-demo cache is complete on CAIR:
 
 It contains normalized geometry/affordance rows for all 3,600 seen demonstrations.
 
+The compact v2 K sweep is complete on CAIR under:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations
+```
+
+The current v3 status is an active CAIR run. The read-only check on 2026-06-21 found `progress_v3.json` with status `running`, `0/23` completed task CSVs, and log path:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/logs/geometry_affordance_v3_k6_20260621_232651.log
+```
+
 ## CAIR Setup
 
 The CAIR experiment root is:
@@ -347,19 +373,12 @@ test_files/geometry_affordance_probe/prompts/xicm_geometry_affordance_prompt.md
 
 ## Next Steps
 
-1. Human-check the two pilot batches.
-2. Fix incorrect geometry or affordance labels and update the normalizer rules.
-3. Scale preprocessing to all 3,600 seen-task demonstrations.
-4. Build separate retrieval ablations:
-   - X-ICM baseline: dynamics only.
-   - X-ICM + geometry.
-   - X-ICM + affordance.
-   - X-ICM + geometry + affordance.
-5. Define similarity functions for `S_geo` and `S_aff`.
-6. Tune `alpha`, `beta`, and `gamma` on seen-task validation splits only.
-7. Add `g_i`, `a_i`, `g_j`, and `a_j` to the X-ICM in-context prompt.
-8. Evaluate once on the held-out AGNOSTOS unseen tasks.
-9. Record failure cases: wrong object, wrong contact point, wrong axis, collision, misalignment, or impossible affordance.
+1. Preserve the completed v1/v2 artifacts before reorganizing anything.
+2. Launch v3 only after confirming no evaluator/watch process is using the same files.
+3. Pull v3 results and regenerate the paper-style tables once all 23 strict final scores exist.
+4. Compare v3 against the v2 `k=6` and `k=8` tie, not only against the original v1 descriptor ablation.
+5. Inspect whether v3 improves the four all-zero v2 tasks: `put_toilet_roll_on_stand`, `put_books_on_bookshelf`, `basketball_in_hoop`, and `scoop_with_spatula`.
+6. Only after the working tree is clean, reorganize trial artifacts into stable v1/v2/v3 folders or add symlink-style indexes that do not break existing scripts.
 
 ## Living Notes
 
