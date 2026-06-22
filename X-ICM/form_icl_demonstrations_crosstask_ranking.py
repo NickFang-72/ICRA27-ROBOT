@@ -685,9 +685,15 @@ def _is_v3_ranking(ranking_metric):
     return "v3" in ranking_metric
 
 
+def _is_v4_ranking(ranking_metric):
+    return "v4" in ranking_metric
+
+
 def _augmented_weights(ranking_metric):
     if all(os.environ.get(name) is not None for name in ["XICM_GA_ALPHA", "XICM_GA_BETA", "XICM_GA_GAMMA"]):
         return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), float(os.environ["XICM_GA_GAMMA"])
+    if _is_v4_ranking(ranking_metric):
+        return 0.70, 0.05, 0.05
     if _is_v3_ranking(ranking_metric):
         return 0.45, 0.10, 0.10
     if _is_v2_ranking(ranking_metric):
@@ -702,6 +708,11 @@ def _augmented_weights(ranking_metric):
 
 
 def _profile_weights(ranking_metric):
+    if _is_v4_ranking(ranking_metric):
+        return (
+            float(os.environ.get("XICM_GA_DELTA", "0.40")),
+            float(os.environ.get("XICM_GA_PENALTY", "0.45")),
+        )
     if _is_v3_ranking(ranking_metric):
         return (
             float(os.environ.get("XICM_GA_DELTA", "0.45")),
@@ -1122,6 +1133,7 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
     delta, penalty_weight = _profile_weights(ranking_metric)
     use_v2 = _is_v2_ranking(ranking_metric)
     use_v3 = _is_v3_ranking(ranking_metric)
+    use_v4 = _is_v4_ranking(ranking_metric)
     query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
     query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
     ranked = []
@@ -1136,7 +1148,7 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
         s_geo = _geometry_similarity(seen_geometry, query_geometry)
         s_aff = _affordance_similarity(seen_affordance, query_affordance)
         seen_profile = _interaction_profile(task, seen_geometry, seen_affordance)
-        if use_v3:
+        if use_v3 or use_v4:
             s_profile = _mechanical_similarity(
                 seen_profile,
                 query_profile,
@@ -1150,7 +1162,7 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
             s_profile = _profile_similarity(seen_profile, query_profile)
             penalty = _profile_conflict_penalty(seen_profile, query_profile) if use_v2 else 0.0
         score = alpha * s_dyn + beta * s_geo + gamma * s_aff
-        if use_v2 or use_v3:
+        if use_v2 or use_v3 or use_v4:
             score += delta * s_profile - penalty_weight * penalty
         ranked.append(
             {
@@ -1166,7 +1178,7 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
             }
         )
     ranked.sort(reverse=True, key=lambda item: item["score"])
-    if use_v3:
+    if use_v3 or use_v4:
         ranked = _select_diverse_ranked_items(ranked, top_k)
     else:
         ranked = ranked[:top_k]
@@ -1229,8 +1241,9 @@ class base_task_handler:
                     query_affordance,
                     include_geometry=_include_geometry(ranking_metric),
                     include_affordance=_include_affordance(ranking_metric),
-                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric),
+                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric) or _is_v4_ranking(ranking_metric),
                     use_v3=_is_v3_ranking(ranking_metric),
+                    use_v4=_is_v4_ranking(ranking_metric),
                 )
 
             top_indices = np.argsort(similarity)[::-1]
@@ -1984,7 +1997,50 @@ def get_stored_demo_key_action_steps(dataset_root, task_name, episode_id, sim_na
     return result
 
 
-def _format_augmented_demo(rank, task_name, episode_id, retrieval_item, include_geometry, include_affordance, use_v2=False):
+def _compact_summary_value(value):
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value[:4]) or "unknown"
+    if isinstance(value, dict):
+        return ", ".join(f"{key}={val}" for key, val in list(value.items())[:4]) or "unknown"
+    text = str(value).strip()
+    return text if text else "unknown"
+
+
+def _scene_summary(task_instruction, task_key, geometry, affordance, profile):
+    manipulated_object = geometry.get("manipulated_object") or task_key
+    primary_shape = geometry.get("primary_shape") or geometry.get("part_geometry") or "unknown shape"
+    key_geometry = geometry.get("task_relevant_geometric_cues") or geometry.get("key_features") or []
+    action = affordance.get("motion_affordance") or profile.get("motion_sequence") or "unknown"
+    contact = affordance.get("required_contact_region") or affordance.get("contact_affordance") or profile.get("contact_strategy") or "unknown"
+    target_relation = profile.get("target_relation") or geometry.get("opening_geometry") or affordance.get("containment_affordance") or "unknown"
+    axis = profile.get("axis_constraint") or geometry.get("axis_geometry") or "unknown"
+    precision = profile.get("precision_driver") or affordance.get("failure_sensitive_property") or affordance.get("precision_requirement") or "unknown"
+    caution = profile.get("transfer_caution") or "match the contact mode before copying coordinates"
+    return (
+        f"Task '{task_instruction}' manipulates {manipulated_object}. "
+        f"Relevant shape/parts: {_compact_summary_value(primary_shape)}. "
+        f"Geometric cues: {_compact_summary_value(key_geometry)}. "
+        f"Target relation: {_compact_summary_value(target_relation)}. "
+        f"Action primitive/direction: {_compact_summary_value(action)}. "
+        f"Contact point/region: {_compact_summary_value(contact)}. "
+        f"Axis or orientation constraint: {_compact_summary_value(axis)}. "
+        f"Precision risk: {_compact_summary_value(precision)}. "
+        f"Transfer caution: {_compact_summary_value(caution)}."
+    )
+
+
+def _format_augmented_demo(
+    rank,
+    task_name,
+    episode_id,
+    retrieval_item,
+    include_geometry,
+    include_affordance,
+    use_v2=False,
+    include_scene_summary=False,
+    include_trajectory=True,
+    include_retrieval_metadata=True,
+):
     review = _load_augmented_review_cache().get((task_name, episode_id), {})
     demo = get_stored_demo_key_action_steps(
         seen_path,
@@ -1997,17 +2053,22 @@ def _format_augmented_demo(rank, task_name, episode_id, retrieval_item, include_
         f"Seen demonstration {rank}:",
         "Task instruction:",
         demo["task_instruction"],
-        (
+    ]
+    if include_retrieval_metadata:
+        lines.extend([
+            (
             f"Retrieval scores: score={retrieval_item['score']:.4f}, "
             f"S_dyn={retrieval_item['s_dyn']:.4f}, "
             f"S_geo={retrieval_item['s_geo']:.4f}, "
             f"S_aff={retrieval_item['s_aff']:.4f}, "
             f"S_profile={retrieval_item['s_profile']:.4f}, "
             f"transfer_penalty={retrieval_item['penalty']:.4f}"
-        ),
-        "",
-    ]
-    if use_v2:
+            ),
+            "",
+        ])
+    else:
+        lines.append("")
+    if use_v2 and include_retrieval_metadata:
         lines.extend(
             [
                 f"Attention bias: {retrieval_item.get('attention_bias', 1.0):.2f}",
@@ -2021,6 +2082,23 @@ def _format_augmented_demo(rank, task_name, episode_id, retrieval_item, include_
         lines.extend([_format_feature_block("Geometry description g_i", review.get("geometry_g_i") or {}, GEOMETRY_FIELDS), ""])
     if include_affordance:
         lines.extend([_format_feature_block("Affordance description a_i", review.get("affordance_a_i") or {}, AFFORDANCE_FIELDS), ""])
+    if include_scene_summary:
+        lines.extend(
+            [
+                "Scene summary s_i:",
+                _scene_summary(
+                    demo["task_instruction"],
+                    task_name,
+                    review.get("geometry_g_i") or {},
+                    review.get("affordance_a_i") or {},
+                    retrieval_item.get("seen_profile", {}),
+                ),
+                "",
+            ]
+        )
+
+    if not include_trajectory:
+        return "\n".join(lines).rstrip()
 
     lines.append("Key observation-action trajectory:")
     for step in demo["steps"]:
@@ -2076,6 +2154,152 @@ def _v3_action_guidance(query_profile):
     return common
 
 
+def _format_v4_user_prompt(
+    ranked,
+    all_demo_paths,
+    query_observation,
+    query_task_key,
+    query_task_instruction,
+    query_geometry,
+    query_affordance,
+    include_geometry=True,
+    include_affordance=True,
+):
+    query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
+    query_scene_summary = _scene_summary(
+        query_task_instruction,
+        query_task_key,
+        query_geometry,
+        query_affordance,
+        query_profile,
+    )
+
+    stage1 = [
+        "<<<V4_STAGE1_PROMPT>>>",
+        f"You will receive {len(ranked)} top-k retrieved seen demonstrations and one unseen query.",
+        "",
+        "Your job is to convert the unseen manipulation task into a clean semantic manipulation plan before any 7D actions are predicted.",
+        "",
+        "Use the retrieved seen demonstrations only as analogies for contact mode, target relation, motion direction, and gripper behavior. Do not copy their 7D coordinates in this stage.",
+        "",
+        "Important rules:",
+        "- Do not output 7D actions in Stage 1.",
+        "- Do not use unseen future observations, unseen ground-truth actions, after-states, or unseen demonstrations.",
+        "- Prefer descriptors and scene summaries that match the unseen contact mechanics over demos with superficially similar object names.",
+        "- Output exactly one compact JSON object with these fields: target_object, reference_object, target_location_relation, target_orientation, action_primitive, motion_direction, contact_point, gripper_plan, success_relation, constraints, demo_use_hint.",
+        "",
+        "Retrieved seen demonstrations summarized for semantic transfer:",
+    ]
+
+    for rank, item in enumerate(ranked, start=1):
+        selected_idx = item["index"]
+        task_name, episode_id = _task_episode_from_path(all_demo_paths[selected_idx])
+        stage1.extend(
+            [
+                _format_augmented_demo(
+                    rank,
+                    task_name,
+                    episode_id,
+                    item,
+                    include_geometry,
+                    include_affordance,
+                    use_v2=True,
+                    include_scene_summary=True,
+                    include_trajectory=False,
+                ),
+                "",
+            ]
+        )
+
+    stage1.extend(
+        [
+            "Unseen query for semantic planning:",
+            "Task instruction:",
+            query_task_instruction,
+            "Task key:",
+            query_task_key,
+            "",
+            "Current observation:",
+            query_observation,
+            "",
+        ]
+    )
+    if include_geometry:
+        stage1.extend([_format_feature_block("Geometry description g_j", query_geometry, GEOMETRY_FIELDS), ""])
+    if include_affordance:
+        stage1.extend([_format_feature_block("Affordance description a_j", query_affordance, AFFORDANCE_FIELDS), ""])
+    stage1.extend(
+        [
+            _format_profile_block("Precise interaction signature p_j", query_profile),
+            "",
+            "Scene summary s_j:",
+            query_scene_summary,
+            "",
+            "Return only the Stage 1 semantic manipulation plan JSON:",
+        ]
+    )
+
+    stage2 = [
+        "<<<V4_STAGE2_CONTEXT>>>",
+        f"You will now receive the same {len(ranked)} retrieved seen demonstrations with their paper-faithful per-key-action observation/action trajectories.",
+        "",
+        "Your job is to use the Stage 1 semantic manipulation plan as a clean intent bottleneck, then predict the unseen task's key 7D action sequence.",
+        "",
+        "Important rules:",
+        "- Each seen demonstration includes per-key-action observations paired with the corresponding 7D action.",
+        "- The unseen query includes only the current/initial observation and task instruction; use the inserted Stage 1 plan for descriptor-derived intent.",
+        "- Do not use unseen future observations, unseen ground-truth actions, after-states, or unseen demonstrations.",
+        "- Adapt one or a few seen trajectory rhythms that match the Stage 1 plan; do not average together conflicting demos.",
+        "- Preserve the X-ICM output format: only a Python-style list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].",
+        "",
+        "Retrieved seen demonstrations with key observation-action trajectories:",
+    ]
+
+    for rank, item in enumerate(ranked, start=1):
+        selected_idx = item["index"]
+        task_name, episode_id = _task_episode_from_path(all_demo_paths[selected_idx])
+        stage2.extend(
+            [
+                _format_augmented_demo(
+                    rank,
+                    task_name,
+                    episode_id,
+                    item,
+                    include_geometry=False,
+                    include_affordance=False,
+                    use_v2=False,
+                    include_scene_summary=False,
+                    include_trajectory=True,
+                    include_retrieval_metadata=False,
+                ),
+                "",
+            ]
+        )
+
+    stage2.extend(
+        [
+            "Unseen query:",
+            "Task instruction:",
+            query_task_instruction,
+            "Task key:",
+            query_task_key,
+            "",
+            "Current observation:",
+            query_observation,
+            "",
+        ]
+    )
+    stage2.extend(
+        [
+            "<<<V4_STAGE2_PLAN_INSERT_HERE>>>",
+            "The agent will insert the Stage 1 semantic manipulation plan here before asking for the final 7D actions.",
+            "",
+            "After reading the inserted semantic plan, predict the key 7D action sequence for the unseen task. Return only a Python-style list of 7D action lists:",
+        ]
+    )
+    return "\n".join(stage1 + [""] + stage2)
+
+
 def _format_augmented_user_prompt(
     ranked,
     all_demo_paths,
@@ -2088,7 +2312,21 @@ def _format_augmented_user_prompt(
     include_affordance=True,
     use_v2=False,
     use_v3=False,
+    use_v4=False,
 ):
+    if use_v4:
+        return _format_v4_user_prompt(
+            ranked,
+            all_demo_paths,
+            query_observation,
+            query_task_key,
+            query_task_instruction,
+            query_geometry,
+            query_affordance,
+            include_geometry=include_geometry,
+            include_affordance=include_affordance,
+        )
+
     query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
     lines = [
         f"You will receive {len(ranked)} top-k retrieved seen demonstrations from the AGNOSTOS seen-task training set. Use all of them as in-context examples for the current unseen query.",

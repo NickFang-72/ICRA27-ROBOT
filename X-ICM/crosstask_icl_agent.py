@@ -38,6 +38,94 @@ class CrossTaskICLAgent(Agent):
             self.SYSTEM_PROMPT = "You are a Franka Panda robot with a parallel gripper. We provide you with some demos from some seen tasks, in the format of [task_instruction, observation]>[ 7-dim action_1, 7-dim action_2, ..., 7-dim action_N ]. Then you will receive an unseen task instruction with a new observation, and you need to output a list of 7-dim actions that match the trends in the demos. Do not output anything else."
 
 
+    def _is_v4(self):
+        return "v4" in self.ranking_method
+
+    def _generate_text(self, messages, max_tokens=256):
+        prompt = self.components["processor"].apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+        llm_inputs = {
+            "prompt": prompt
+        }
+
+        sampling_params = SamplingParams(
+            temperature=0.1,
+            top_p=0.001,
+            repetition_penalty=1.05,
+            max_tokens=max_tokens,
+            stop_token_ids=[],
+        )
+
+        outputs = self.components["llm"].generate([llm_inputs], sampling_params=sampling_params)
+        return outputs[0].outputs[0].text
+
+    def _split_v4_prompt(self, user_prompt):
+        stage1_marker = "<<<V4_STAGE1_PROMPT>>>"
+        stage2_marker = "<<<V4_STAGE2_CONTEXT>>>"
+        if stage1_marker not in user_prompt or stage2_marker not in user_prompt:
+            raise ValueError("v4 prompt is missing expected stage markers")
+        stage1_text, _, stage2_text = user_prompt.partition(stage2_marker)
+        stage1_text = stage1_text.replace(stage1_marker, "", 1).strip()
+        return stage1_text, stage2_text.strip()
+
+    def _run_v4_semantic_bottleneck(self, user_prompt):
+        stage1_prompt, stage2_context = self._split_v4_prompt(user_prompt)
+
+        stage1_system_prompt = (
+            "You are a Franka Panda robot planning at the semantic intent level. "
+            "Your output must be a compact JSON object describing the manipulation target, relation, orientation, action primitive, direction, contact point, gripper plan, and constraints. "
+            "Do not output 7D actions in this stage."
+        )
+        stage2_system_prompt = (
+            "You are a Franka Panda robot with a parallel gripper. "
+            "Use the semantic manipulation plan and retrieved seen demonstrations to predict the unseen task's key 7D action sequence. "
+            "Return only a Python-style list of 7D action lists. Do not output anything else."
+        )
+
+        print(stage1_system_prompt)
+        print()
+        print(stage1_prompt)
+
+        semantic_plan = self._generate_text(
+            [
+                {"role": "system", "content": stage1_system_prompt},
+                {"role": "user", "content": stage1_prompt},
+            ],
+            max_tokens=384,
+        )
+        print("Semantic plan:", semantic_plan)
+
+        plan_insert = (
+            "Stage 1 semantic manipulation plan:\n"
+            f"{semantic_plan}\n\n"
+            "Use this plan as the primary task intent, while using the retrieved trajectories for coordinate/action style."
+        )
+        stage2_prompt = stage2_context.replace("<<<V4_STAGE2_PLAN_INSERT_HERE>>>", plan_insert, 1)
+        stage2_prompt = stage2_prompt.replace(
+            "The agent will insert the Stage 1 semantic manipulation plan here before asking for the final 7D actions.",
+            "",
+            1,
+        )
+
+        print()
+        print(stage2_system_prompt)
+        print()
+        print(stage2_prompt)
+
+        output_text = self._generate_text(
+            [
+                {"role": "system", "content": stage2_system_prompt},
+                {"role": "user", "content": stage2_prompt},
+            ],
+            max_tokens=256,
+        )
+        print(f"Prediction:", output_text)
+        return output_text
+
     def _preprocess(self, obs, step, **kwargs):
         rgb_dict = {}
         mask_id_to_sim_name = {}
@@ -75,6 +163,9 @@ class CrossTaskICLAgent(Agent):
         if len(self.actions) == 0:
             user_prompt = self.handler.get_user_prompt_ranking(mask_dict, mask_id_to_sim_name, point_cloud_dict, custom_num_demos=self.demo_num_per_icl, taskname=lang_goal, image_path=self.front_rgb_path, seed=self.seed, ranking_metric=self.ranking_method)   
 
+            if self._is_v4():
+                return self._run_v4_semantic_bottleneck(user_prompt)
+
             print(self.SYSTEM_PROMPT) 
 
             print()
@@ -88,27 +179,7 @@ class CrossTaskICLAgent(Agent):
 
 
             ########################### vllm local deploy #####################################
-            prompt = self.components["processor"].apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-            )
-                
-            llm_inputs = {
-                "prompt": prompt
-            }
-            
-
-            sampling_params = SamplingParams(
-                temperature=0.1,
-                top_p=0.001,
-                repetition_penalty=1.05,
-                max_tokens=256,
-                stop_token_ids=[],
-            )
-
-            outputs = self.components["llm"].generate([llm_inputs], sampling_params=sampling_params)
-            output_text = outputs[0].outputs[0].text
+            output_text = self._generate_text(messages, max_tokens=256)
 
             print(f"Prediction:", output_text)
             return output_text

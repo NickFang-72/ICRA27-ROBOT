@@ -51,6 +51,7 @@ RUNS = {
     "geometry_affordance_v2_k8": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.8_test",
     "geometry_affordance_v2_k10": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v2_Qwen2.5.7B.instruct_icl.10_test",
     "geometry_affordance_v3_k6": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v3_Qwen2.5.7B.instruct_icl.6_test",
+    "geometry_affordance_v4_k6": "XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v4_Qwen2.5.7B.instruct_icl.6_test",
 }
 
 PAPER_RUNS = {
@@ -69,6 +70,7 @@ PAPER_TABLE_COLUMNS = [
     ("geometry_affordance_v2_k8", "+ geometry + affordance v2 k=8"),
     ("geometry_affordance_v2_k10", "+ geometry + affordance v2 k=10"),
     ("geometry_affordance_v3_k6", "+ geometry + affordance v3 k=6"),
+    ("geometry_affordance_v4_k6", "+ semantic bottleneck v4 k=6"),
 ]
 
 SUMMARY_LABELS = {

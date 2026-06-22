@@ -11,15 +11,16 @@ The goal is to test whether X-ICM retrieves better seen demonstrations when the 
 
 ## Trial Versions
 
-This project now has three geometry/affordance trial lines. They should be kept conceptually separate even when the implementation shares `X-ICM/form_icl_demonstrations_crosstask_ranking.py`.
+This project now has four geometry/affordance trial lines. They should be kept conceptually separate even when the implementation shares `X-ICM/form_icl_demonstrations_crosstask_ranking.py`.
 
 | Version | Ranking method | Main idea | Current status |
 |---|---|---|---|
 | v1 | `lang_vis.out.geo_aff` | Add Qwen geometry `g_i/g_j` and RoboPoint affordance `a_i/a_j` to retrieval and prompt context. | Completed ablation, average `20.87`; underperformed the original rerun. |
 | v2 | `lang_vis.out.geo_aff_v2` | Keep dynamics similarity as the anchor, add a precise interaction signature, transfer penalties, and prompt-visible attention bias. | Compact K sweep complete for `k=6,8,10`; best average tied at `21.74` for `k=6` and `k=8`. |
-| v3 | `lang_vis.out.geo_aff_v3` | Use contact-mode/mechanical compatibility, stronger conflict penalties, retrieval diversity caps, and explicit contact-mode prompt guidance. | Running on CAIR as `geometry_affordance_v3_k6`; no completed task results yet. |
+| v3 | `lang_vis.out.geo_aff_v3` | Use contact-mode/mechanical compatibility, stronger conflict penalties, retrieval diversity caps, and explicit contact-mode prompt guidance. | Completed `k=6`, average `20.00`; failed to improve because the prompt still asked the model to turn many descriptor-heavy demos directly into one 7D action chain. |
+| v4 | `lang_vis.out.geo_aff_v4` | Test a semantic bottleneck: Stage 1 converts descriptor-heavy context into a simple manipulation intent, then Stage 2 uses that intent plus seen observation/action trajectories to predict 7D actions. | Prepared for `k=6` CAIR benchmark. |
 
-The important difference between v2 and v3 is the retrieval question. V2 asks whether a seen demo is a mostly dynamics-compatible example with some descriptor/profile tie-breaking. V3 asks whether the seen demo teaches the same physical interaction: contact mode, target relation, motion sequence, required contact region, axis constraint, and clearance.
+The important difference between v2, v3, and v4 is where the extra structure enters. V2 uses descriptors as conservative retrieval tie-breakers. V3 tries to retrieve physically compatible demonstrations more aggressively, but still gives the LLM one large descriptor-and-trajectory prompt. V4 keeps the retrieval idea but splits prompting into two calls so the model first states the manipulation intent in simple words, then predicts the 7D action sequence from that intent and the retrieved action examples.
 
 Directory organization is intentionally postponed as of 2026-06-21. Several v1/v2-related files are already edited in the working tree, and a local v2 watcher was active during this documentation pass. To avoid disturbing running or dirty trial state, do not move, rename, or reorganize trial scripts/logs until the worktree is clean and no watcher/evaluator is active.
 

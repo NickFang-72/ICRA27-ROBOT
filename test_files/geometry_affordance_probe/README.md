@@ -54,6 +54,7 @@ active.
 | v1 | `lang_vis.out.geo_aff` | 18 | First descriptor ablation: combine dynamics with geometry and affordance similarity. |
 | v2 | `lang_vis.out.geo_aff_v2` | 6, 8, 10 | Compact rerun with dynamics-heavy scoring, interaction signatures, transfer penalties, and attention bias. |
 | v3 | `lang_vis.out.geo_aff_v3` | 6 | Contact-mode retrieval with mechanical compatibility, stronger conflict penalties, and diversity caps. |
+| v4 | `lang_vis.out.geo_aff_v4` | 6 | Two-stage semantic bottleneck: descriptor-heavy context produces a simple manipulation intent, then the intent plus seen observation/action trajectories predicts 7D actions. |
 
 Short difference between v2 and v3:
 
@@ -63,11 +64,29 @@ Short difference between v2 and v3:
   influence as dynamics, penalizes known bad analogies harder, and prevents the
   top-k prompt from being dominated by repeated near-duplicate demos.
 
-As of the latest CAIR check, v2 is complete and v3 is running with `0/23`
-completed remote task CSVs. The active v3 progress file is
-`/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/progress_v3.json`,
-and completed outputs should appear under
-`XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v3_Qwen2.5.7B.instruct_icl.6_test`.
+As of the latest completed CAIR run, v2 is complete and v3 `k=6` is complete
+with an average score of `20.00`. V3 did not help because the model still had
+to convert several descriptor-heavy demonstrations directly into one 7D action
+chain, so bad or conflicting demo rhythms could still dominate the output.
+
+V4 tests a cleaner split:
+
+```text
+Stage 1: descriptors + scene summaries -> semantic manipulation plan
+Stage 2: semantic plan + seen observation/action trajectories + unseen current observation -> 7D actions
+```
+
+The active v4 method name is:
+
+```text
+XICM_Cross.ZS_Ranking.lang_vis.out.geo_aff_v4_Qwen2.5.7B.instruct_icl.6_test
+```
+
+The v4 progress file is:
+
+```text
+/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/progress_v4.json
+```
 
 ## V2 Geometry/Affordance Ablation
 
