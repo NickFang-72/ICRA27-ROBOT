@@ -22,6 +22,16 @@ build/
 dist/
 *.egg-info/
 
+# Large local data, model, and checkpoint payloads
+data/
+datasets/
+models/
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
 # Editor metadata
 .vscode/
 .idea/
@@ -30,6 +40,22 @@ dist/
 logs/
 *.log
 
+# Generated reports and presentation exports
+outputs/
+work/
+
+# Local experiment outputs.
+# Keep source code, launch scripts, fixtures, and docs in Git; keep generated
+# benchmark logs, review packets, images, tables, and pulled CAIR artifacts
+# only on the local machine or CAIR.
+test_files/geometry_affordance_probe/ablation_results/
+test_files/geometry_affordance_probe/batch_*/
+test_files/geometry_affordance_probe/review/
+test_files/geometry_affordance_probe/figures/
+test_files/xicm_baseline_results/
+
 # Local CAIR transfer runtime state
 test_files/geometry_affordance_probe/*.pid
 test_files/geometry_affordance_probe/*.lock
+test_files/geometry_affordance_probe/ablation_results/.v4_k6_last_strict_count
+test_files/geometry_affordance_probe/ablation_results/cair_logs/_archived_partial_v4/

@@ -39,27 +39,55 @@ AUGMENTED_REVIEW_CACHE = None
 AUGMENTED_DEMO_STEPS_CACHE = {}
 
 GEOMETRY_FIELDS = [
-    "manipulated_object",
-    "key_features",
-    "primary_shape",
-    "part_geometry",
-    "opening_geometry",
-    "axis_geometry",
-    "clearance_geometry",
-    "task_relevant_geometric_cues",
+    "action_primitive",
+    "motion_type",
+    "motion_axis",
+    "contact_type",
+    "contact_region",
+    "constraint_type",
+    "alignment_requirement",
 ]
 
-AFFORDANCE_FIELDS = [
-    "grasp_affordance",
-    "contact_affordance",
-    "motion_affordance",
-    "containment_affordance",
-    "articulation_affordance",
-    "required_contact_region",
-    "preferred_contact_points",
-    "precision_requirement",
-    "failure_sensitive_property",
+CONTACT_HINT_FIELDS = [
+    "contact_mode",
+    "source_view",
+    "target_object",
+    "target_part",
+    "points_2d_normalized",
+    "contact_region_text",
+    "candidate_contact_coordinates",
+    "use_as",
 ]
+
+GOAL_STATE_FIELDS = [
+    "goal_state_type",
+    "manipulated_object",
+    "target_object_or_region",
+    "required_final_relation",
+    "contact_or_release_target",
+    "required_motion_constraint",
+    "required_orientation_or_alignment",
+    "release_or_stop_condition",
+    "success_check",
+    "goal_tags",
+    "transfer_note",
+]
+
+# Legacy name kept so older helper calls do not break. In the clean v1 path
+# these are RoboPoint contact hints, not symbolic affordance descriptors and not
+# a retrieval score.
+AFFORDANCE_FIELDS = CONTACT_HINT_FIELDS
+
+GEOMETRY_FIELD_WEIGHTS = {
+    "action_primitive": 0.45,
+    "motion_type": 0.15,
+    "motion_axis": 0.15,
+    "contact_type": 0.08,
+    "contact_region": 0.07,
+    "constraint_type": 0.07,
+    "alignment_requirement": 0.03,
+}
+ACTION_MISMATCH_SCORE_CAP = 0.25
 
 PROFILE_FIELDS = [
     "interaction_family",
@@ -155,6 +183,273 @@ V3_FAMILY_GROUPS = [
         "screw_closure",
     },
 ]
+
+PLAN_FAMILY_COMPATIBILITY = {
+    "flat_object_docking_place": {
+        "near": {"object_to_holder_placement", "object_to_rack_placement"},
+        "weak": {"object_on_flat_surface", "object_into_open_receptacle"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "thin_object_slot_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+            "knob_or_handle_rotation",
+        },
+    },
+    "object_on_flat_surface": {
+        "near": {"object_to_holder_placement", "object_to_rack_placement", "remove_from_support_surface"},
+        "weak": {"flat_object_docking_place", "surface_slide_to_target"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "thin_object_slot_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+            "hinged_door_close",
+            "hinged_panel_close",
+        },
+    },
+    "hinged_door_close": {
+        "near": {"linear_handle_pull", "hinged_panel_close", "hinged_lid_open"},
+        "weak": {"surface_slide_to_target", "button_press"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "thin_object_slot_insertion",
+            "screw_closure",
+            "object_to_holder_placement",
+            "object_to_rack_placement",
+        },
+    },
+    "hinged_panel_close": {
+        "near": {"linear_handle_pull", "hinged_door_close", "hinged_lid_open"},
+        "weak": {"surface_slide_to_target", "button_press"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "thin_object_slot_insertion",
+            "screw_closure",
+            "object_to_holder_placement",
+            "object_to_rack_placement",
+        },
+    },
+    "hinged_lid_open": {
+        "near": {"linear_handle_pull", "hinged_door_close", "hinged_panel_close"},
+        "weak": {"remove_from_support_surface"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "thin_object_slot_insertion",
+            "screw_closure",
+        },
+    },
+    "button_or_switch_press": {
+        "near": {"button_press"},
+        "weak": {"knob_or_handle_rotation"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "object_to_holder_placement",
+            "object_to_rack_placement",
+            "object_into_open_receptacle",
+            "object_into_drawer",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "linear_handle_pull",
+        },
+    },
+    "object_into_open_receptacle": {
+        "near": {"object_into_drawer", "object_into_shelf", "sweep_into_receptacle", "round_object_into_open_goal"},
+        "weak": {"object_to_holder_placement", "object_to_rack_placement", "thin_object_slot_insertion"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "object_into_shelf": {
+        "near": {"object_into_open_receptacle", "object_into_drawer", "object_to_rack_placement"},
+        "weak": {"thin_object_slot_insertion", "object_to_holder_placement"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "elongated_object_into_stand": {
+        "near": {"object_into_open_receptacle", "object_to_holder_placement", "object_to_rack_placement"},
+        "weak": {"ring_to_peg_insertion", "thin_object_slot_insertion"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "hole_over_vertical_stand": {
+        "near": {"ring_to_peg_insertion", "threaded_socket_insertion", "object_to_holder_placement"},
+        "weak": {"nested_object_stacking", "shape_profile_insertion"},
+        "blocked": {
+            "rigid_object_stacking",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+            "knob_or_handle_rotation",
+            "linear_handle_pull",
+        },
+    },
+    "linear_pull_from_slot": {
+        "near": {"linear_handle_pull", "remove_flat_object_from_rack"},
+        "weak": {"thin_object_slot_insertion", "object_to_rack_placement"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "lift_lid_from_container": {
+        "near": {"remove_from_support_surface", "linear_handle_pull"},
+        "weak": {"screw_closure", "object_into_open_receptacle"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "remove_flat_object_from_rack": {
+        "near": {"linear_handle_pull", "remove_from_support_surface", "object_to_rack_placement"},
+        "weak": {"thin_object_slot_insertion", "object_to_holder_placement"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "round_object_into_open_goal": {
+        "near": {"object_into_open_receptacle", "sweep_into_receptacle"},
+        "weak": {"object_to_holder_placement", "object_to_rack_placement"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "tool_scoop_under_object": {
+        "near": {"tool_drag_to_target", "surface_slide_to_target", "sweep_into_receptacle"},
+        "weak": {"remove_from_support_surface"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "deformable_drag_straighten": {
+        "near": {"tool_drag_to_target", "surface_slide_to_target", "sweep_into_receptacle"},
+        "weak": {"remove_from_support_surface"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+    "knob_or_handle_rotation": {
+        "near": {"screw_closure"},
+        "weak": {"button_press", "button_or_switch_press", "linear_handle_pull"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "object_to_holder_placement",
+            "object_to_rack_placement",
+            "object_into_open_receptacle",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+        },
+    },
+    "pour_to_target": {
+        "near": {"object_to_holder_placement", "object_to_rack_placement"},
+        "weak": {"linear_handle_pull", "object_into_open_receptacle"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+        },
+    },
+}
+
+PLAN_TIER_SCORES = {
+    "exact": 1.0,
+    "near": 0.72,
+    "weak": 0.35,
+    "blocked": 0.0,
+    "unknown": 0.20,
+}
 
 TASK_PROFILE_OVERRIDES = {
     "close_jar": {
@@ -674,7 +969,9 @@ def _include_geometry(ranking_metric):
 
 
 def _include_affordance(ranking_metric):
-    return "geo_aff" in ranking_metric or ".aff" in ranking_metric
+    # Clean v1 restarts geometry as the only retrieval descriptor. RoboPoint is
+    # contact-hint evidence for the final prompt after validation, not S_aff.
+    return ".aff" in ranking_metric and "geo_aff" not in ranking_metric
 
 
 def _is_v2_ranking(ranking_metric):
@@ -689,25 +986,38 @@ def _is_v4_ranking(ranking_metric):
     return "v4" in ranking_metric
 
 
+def _is_plan_ranking(ranking_metric):
+    return "geo_plan" in ranking_metric or ".plan" in ranking_metric
+
+
 def _augmented_weights(ranking_metric):
     if all(os.environ.get(name) is not None for name in ["XICM_GA_ALPHA", "XICM_GA_BETA", "XICM_GA_GAMMA"]):
-        return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), float(os.environ["XICM_GA_GAMMA"])
+        # Contact hints/points are prompt-only. Keep the gamma env var accepted
+        # for older launch scripts, but never let it affect retrieval.
+        return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), 0.0
+    if _is_plan_ranking(ranking_metric):
+        return 0.72, 0.03, 0.0
     if _is_v4_ranking(ranking_metric):
-        return 0.70, 0.05, 0.05
+        return 0.70, 0.05, 0.0
     if _is_v3_ranking(ranking_metric):
-        return 0.45, 0.10, 0.10
+        return 0.45, 0.10, 0.0
     if _is_v2_ranking(ranking_metric):
-        return 0.82, 0.04, 0.04
+        return 0.82, 0.04, 0.0
     if "geo_aff" in ranking_metric:
-        return 0.65, 0.30, 0.05
+        return 0.65, 0.35, 0.0
     if ".geo" in ranking_metric:
         return 0.65, 0.35, 0.0
     if ".aff" in ranking_metric:
-        return 0.65, 0.0, 0.35
+        return 1.0, 0.0, 0.0
     return 1.0, 0.0, 0.0
 
 
 def _profile_weights(ranking_metric):
+    if _is_plan_ranking(ranking_metric):
+        return (
+            float(os.environ.get("XICM_GA_DELTA", "0.25")),
+            float(os.environ.get("XICM_GA_PENALTY", "0.55")),
+        )
     if _is_v4_ranking(ranking_metric):
         return (
             float(os.environ.get("XICM_GA_DELTA", "0.40")),
@@ -822,6 +1132,300 @@ def _descriptor_tokens(descriptor, fields):
     return {token for token in tokens if token not in {"none", "unknown", "null"}}
 
 
+def _first_label(value, default="unknown"):
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower().replace(" ", "_")
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            label = _first_label(item, "")
+            if label:
+                return label
+    return default
+
+
+def _as_labels(value):
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip().lower().replace(" ", "_")] if value.strip() else []
+    if isinstance(value, (list, tuple, set)):
+        labels = []
+        for item in value:
+            labels.extend(_as_labels(item))
+        return labels
+    return []
+
+
+def _action_from_affordance(affordance):
+    action = _first_label(
+        affordance.get("motion_affordance")
+        or affordance.get("action_primitive")
+        or affordance.get("contact_affordance"),
+        "unknown",
+    )
+    if action in {"rotate", "rotate_part"}:
+        return "twist"
+    if action in {"lift_and_place", "lift_then_place"}:
+        return "place"
+    if action in {"lift_then_insert", "insert_then_twist"}:
+        return "insert"
+    if action in {"push_surface"}:
+        return "push"
+    if action in {"pull_handle"}:
+        return "pull"
+    if action in {"button_press"}:
+        return "press"
+    return action
+
+
+def _action_from_task(task_key, action):
+    task_text = _first_label(task_key, "")
+    if "push_buttons" in task_text:
+        return "press"
+    if "sweep_to_dustpan" in task_text:
+        return "sweep"
+    return action
+
+
+def _normalize_target_part(value):
+    part = _first_label(value, "unknown")
+    if part in {"handle", "lid", "rim", "knob", "button_top", "slot", "hole", "opening", "body", "edge", "spout", "socket", "surface", "unknown"}:
+        return part
+    if "button" in part:
+        return "button_top"
+    if "handle" in part:
+        return "handle"
+    if "knob" in part:
+        return "knob"
+    if "rim" in part:
+        return "rim"
+    if "edge" in part:
+        return "edge"
+    if "slot" in part:
+        return "slot"
+    if "hole" in part or "socket" in part:
+        return "hole"
+    if "opening" in part:
+        return "opening"
+    if "side" in part or "surface" in part:
+        return "surface"
+    if "body" in part or "base" in part:
+        return "body"
+    return "unknown"
+
+
+def _normalize_primary_shape(value, text):
+    shape = _first_label(value, "")
+    text = " ".join([shape, text.lower()])
+    if "push_buttons" in text:
+        return "button"
+    if "insert_onto_square_peg" in text:
+        return "peg"
+    if "close_jar" in text or "light_bulb_in" in text:
+        return "round_object"
+    if any(token in text for token in ["open_drawer", "put_item_in_drawer", "put_money_in_safe", "put_groceries_in_cupboard", "place_shape_in_shape_sorter", "slide_block_to_color_target"]):
+        return "box_like"
+    if "sweep_to_dustpan" in text:
+        return "thin_flat_object"
+    if "turn_tap" in text:
+        return "elongated_tool"
+    if "button" in text:
+        return "button"
+    if "peg" in text:
+        return "peg"
+    if any(token in text for token in ["drawer", "safe", "cupboard", "block", "box", "rectangular", "cube"]):
+        return "box_like"
+    if any(token in text for token in ["money", "thin", "flat", "plate"]):
+        return "thin_flat_object"
+    if any(token in text for token in ["tap", "handle", "spatula", "tool", "sweeping"]):
+        return "elongated_tool"
+    if any(token in text for token in ["jar", "bulb", "round", "circular", "cylinder", "cylindrical", "rim"]):
+        return "round_object"
+    if any(token in text for token in ["shape_sorter", "shape_profile", "irregular"]):
+        return "irregular"
+    if shape in {"round_object", "box_like", "thin_flat_object", "elongated_tool", "button", "peg", "irregular", "unknown"}:
+        return shape
+    return "unknown"
+
+
+def _normalize_constraint_type(value, action, tags):
+    constraint = _first_label(value, "unknown")
+    tags = set(_as_labels(tags))
+    if action in {"twist", "rotate"} or tags.intersection({"hinge", "sliding_axis", "rotational_axis"}):
+        return "joint"
+    if "slot" in constraint:
+        return "slot"
+    if "hole" in constraint or "socket" in constraint:
+        return "hole"
+    if "opening" in constraint or constraint in {"receptacle", "open_container", "closed_container"}:
+        return "container"
+    if constraint in {"support_cradle", "support"}:
+        return "support_surface"
+    if constraint in {"slot", "hole", "container", "joint", "support_surface", "surface_target", "free_space", "none", "unknown"}:
+        return constraint
+    return "none" if constraint in {"", "unknown"} else constraint
+
+
+def _normalize_state(value):
+    state = _first_label(value, "unknown")
+    if state in {"open", "closed", "attached", "detached", "inside", "on_surface", "free", "unknown"}:
+        return state
+    if "open" in state:
+        return "open"
+    if "closed" in state:
+        return "closed"
+    if "attached" in state or "grasp" in state or "held" in state:
+        return "attached"
+    if "inside" in state:
+        return "inside"
+    if "surface" in state:
+        return "on_surface"
+    if "free" in state:
+        return "free"
+    return "unknown"
+
+
+def _motion_type_from_axis(axis, action):
+    axis = _first_label(axis, "unknown")
+    action = _first_label(action, "unknown")
+    if action in {"twist", "rotate"} or "rotat" in axis or "tilt" in axis:
+        return "rotational"
+    if action in {"insert"}:
+        return "insertion"
+    if action in {"place", "stack", "lift"}:
+        return "vertical"
+    if action in {"slide", "sweep", "drag"}:
+        return "planar"
+    if action in {"push", "pull", "press"}:
+        return "linear"
+    if axis in {"horizontal", "vertical", "linear", "front_normal"}:
+        return "linear"
+    return "unknown"
+
+
+def _motion_axis_from_axis(axis, action):
+    axis = _first_label(axis, "unknown")
+    action = _first_label(action, "unknown")
+    if action in {"twist", "rotate"} or "rotat" in axis or "tilt" in axis:
+        return "rotational"
+    if action in {"insert"} or axis in {"slot", "hole", "front_opening", "top_opening", "support_cradle"}:
+        return "into_opening"
+    if action in {"slide", "sweep", "drag"} or axis == "free_motion":
+        return "across_surface"
+    if action in {"place", "stack", "lift"} or axis == "vertical":
+        return "vertical"
+    if action in {"push", "pull"} or axis in {"horizontal", "linear"}:
+        return "horizontal"
+    if action == "press":
+        return "surface_normal"
+    return "unknown"
+
+
+def _constraint_from_opening(opening, affordance):
+    opening = _first_label(opening, "unknown")
+    containment = _first_label(affordance.get("containment_affordance"), "")
+    articulation = _first_label(affordance.get("articulation_affordance"), "")
+    if any(token in opening for token in ["slot", "hole", "opening"]):
+        return opening
+    if containment in {"slot", "hole", "receptacle", "open_container", "closed_container"}:
+        return containment
+    if "hinge" in articulation or "drawer" in articulation:
+        return "joint"
+    if opening in {"support_cradle"}:
+        return "support_surface"
+    if opening in {"none", "unknown"}:
+        return "none"
+    return opening
+
+
+def _contact_type_from_action(action):
+    if action in {"pull", "lift", "place", "insert", "stack", "twist"}:
+        return "grasp"
+    if action == "press":
+        return "press"
+    if action in {"push", "slide", "sweep", "drag"}:
+        return "surface_contact"
+    return "unknown"
+
+
+def _alignment_from_geometry(geometry, affordance):
+    text = json.dumps({"geometry": geometry, "affordance": affordance}, sort_keys=True).lower()
+    if any(token in text for token in ["alignment_sensitive", "misalignment", "slot", "hole", "peg", "socket", "shape_profile"]):
+        return "high"
+    if any(token in text for token in ["target", "rack", "shelf", "hoop", "rim"]):
+        return "medium"
+    return "low"
+
+
+def _object_category_from_text(text):
+    text = text.lower()
+    if any(token in text for token in ["drawer", "door", "lid", "hinge", "knob", "tap", "switch", "button"]):
+        return "articulated_or_control"
+    if any(token in text for token in ["slot", "hole", "socket", "peg", "stand", "shape_sorter"]):
+        return "alignment_target"
+    if any(token in text for token in ["cupboard", "bin", "shelf", "rack", "hoop", "container", "safe"]):
+        return "receptacle_or_support"
+    if any(token in text for token in ["rope", "spatula", "knife", "umbrella", "charger", "usb"]):
+        return "elongated_or_tool"
+    return "rigid_object"
+
+
+def _canonical_geometry(task_key, geometry, affordance=None):
+    affordance = affordance or {}
+    geometry = geometry or {}
+    action = _first_label(geometry.get("action_primitive"), "")
+    if not action:
+        action = _action_from_affordance(affordance)
+    action = _action_from_task(task_key, action)
+    old_tags = _as_labels(geometry.get("geometry_tags")) or _as_labels(geometry.get("task_relevant_geometric_cues")) or _as_labels(geometry.get("key_features"))
+    old_tags = [
+        tag for tag in old_tags
+        if tag not in {"left", "right", "left_orientation", "right_orientation", "downward_direction", "upward_direction", "color", "red", "green", "blue", "maroon", "robot_arm", "elbow", "wrist", "static", "standing"}
+    ]
+    target_part = _normalize_target_part(
+        geometry.get("target_part")
+        or affordance.get("required_contact_region")
+        or geometry.get("part_geometry")
+    )
+    manipulated_object = _first_label(geometry.get("manipulated_object"), task_key)
+    text = " ".join([task_key, manipulated_object, target_part, " ".join(old_tags)])
+    constraint_type = _normalize_constraint_type(
+        _first_label(geometry.get("constraint_type"), _constraint_from_opening(geometry.get("opening_geometry"), affordance)),
+        action,
+        old_tags,
+    )
+    canonical = {
+        "manipulated_object": manipulated_object,
+        "object_category": _first_label(geometry.get("object_category"), _object_category_from_text(text)),
+        "primary_shape": _normalize_primary_shape(geometry.get("primary_shape"), text),
+        "target_part": target_part,
+        "secondary_parts": _as_labels(geometry.get("secondary_parts")) or _as_labels(geometry.get("part_geometry"))[:3],
+        "action_primitive": action,
+        "motion_type": _first_label(geometry.get("motion_type"), _motion_type_from_axis(geometry.get("axis_geometry"), action)),
+        "motion_axis": _first_label(geometry.get("motion_axis"), _motion_axis_from_axis(geometry.get("axis_geometry") or geometry.get("opening_geometry"), action)),
+        "contact_type": _first_label(geometry.get("contact_type"), _contact_type_from_action(action)),
+        "contact_region": _first_label(geometry.get("contact_region") or affordance.get("required_contact_region"), target_part),
+        "constraint_type": constraint_type,
+        "alignment_requirement": _first_label(geometry.get("alignment_requirement"), _alignment_from_geometry(geometry, affordance)),
+        "state": _normalize_state(geometry.get("state") or geometry.get("pose_relation")),
+        "geometry_tags": sorted(set(old_tags + _as_labels(geometry.get("geometry_tags")))),
+    }
+    if geometry.get("execution_clearance_hint") or geometry.get("clearance_geometry"):
+        canonical["execution_clearance_hint"] = _first_label(
+            geometry.get("execution_clearance_hint") or geometry.get("clearance_geometry"),
+            "unknown",
+        )
+    return canonical
+
+
+def _field_match_score(seen_geometry, query_geometry, field):
+    seen_value = seen_geometry.get(field)
+    query_value = query_geometry.get(field)
+    if field == "geometry_tags":
+        return _jaccard(set(_as_labels(seen_value)), set(_as_labels(query_value)))
+    return _profile_value_similarity(seen_value, query_value)
+
+
 def _jaccard(a, b):
     if not a or not b:
         return 0.0
@@ -854,22 +1458,24 @@ def _point_similarity(a, b):
 
 
 def _geometry_similarity(seen_geometry, query_geometry):
-    return _jaccard(
-        _descriptor_tokens(seen_geometry, GEOMETRY_FIELDS),
-        _descriptor_tokens(query_geometry, GEOMETRY_FIELDS),
-    )
+    seen_geometry = _canonical_geometry("", seen_geometry)
+    query_geometry = _canonical_geometry("", query_geometry)
+    score = 0.0
+    total = 0.0
+    for field, weight in GEOMETRY_FIELD_WEIGHTS.items():
+        score += weight * _field_match_score(seen_geometry, query_geometry, field)
+        total += weight
+    normalized = score / total if total else 0.0
+    seen_action = _first_label(seen_geometry.get("action_primitive"), "")
+    query_action = _first_label(query_geometry.get("action_primitive"), "")
+    if seen_action and query_action and seen_action != query_action and "unknown" not in {seen_action, query_action}:
+        return min(normalized, ACTION_MISMATCH_SCORE_CAP)
+    return normalized
 
 
 def _affordance_similarity(seen_affordance, query_affordance):
-    label_score = _jaccard(
-        _descriptor_tokens(seen_affordance, AFFORDANCE_FIELDS),
-        _descriptor_tokens(query_affordance, AFFORDANCE_FIELDS),
-    )
-    seen_points = _points(seen_affordance.get("preferred_contact_points"))
-    query_points = _points(query_affordance.get("preferred_contact_points"))
-    if seen_points and query_points:
-        return 0.8 * label_score + 0.2 * _point_similarity(seen_points, query_points)
-    return label_score
+    # Clean v1 does not use RoboPoint/contact hints for retrieval.
+    return 0.0
 
 
 def _profile_tokens(value):
@@ -884,27 +1490,149 @@ def _profile_tokens(value):
 
 
 def _interaction_profile(task_key, geometry, affordance):
+    geometry = _canonical_geometry(task_key, geometry, affordance)
     profile = {
         "interaction_family": geometry.get("manipulated_object", task_key),
-        "motion_sequence": affordance.get("motion_affordance", "unknown"),
-        "contact_strategy": affordance.get("required_contact_region")
-        or affordance.get("contact_affordance")
-        or affordance.get("grasp_affordance")
-        or "unknown",
-        "target_relation": geometry.get("opening_geometry")
-        or affordance.get("containment_affordance")
-        or "unknown",
-        "axis_constraint": geometry.get("axis_geometry", "unknown"),
-        "articulation_model": affordance.get("articulation_affordance", "none"),
-        "precision_driver": affordance.get("failure_sensitive_property")
-        or affordance.get("precision_requirement")
-        or "unknown",
-        "transfer_caution": "descriptor_inferred_profile",
+        "motion_sequence": geometry.get("action_primitive", "unknown"),
+        "contact_strategy": geometry.get("contact_region") or geometry.get("contact_type") or "unknown",
+        "target_relation": geometry.get("constraint_type") or "unknown",
+        "axis_constraint": geometry.get("motion_axis", "unknown"),
+        "articulation_model": geometry.get("motion_type", "unknown"),
+        "precision_driver": geometry.get("alignment_requirement") or "unknown",
+        "transfer_caution": "primitive_geometry_profile",
     }
     override = TASK_PROFILE_OVERRIDES.get(task_key)
     if override:
         profile.update(override)
     return profile
+
+
+def _goal_state_type_from_profile(profile):
+    semantic_fields = [
+        "interaction_family",
+        "motion_sequence",
+        "contact_strategy",
+        "target_relation",
+        "axis_constraint",
+        "articulation_model",
+        "precision_driver",
+    ]
+    text = " ".join(str(profile.get(field, "")) for field in semantic_fields).lower()
+    if any(token in text for token in ["button", "switch", "knob", "tap", "rotary_control", "oven_state"]):
+        return "control_or_articulation_state"
+    if any(token in text for token in ["hinge", "door", "lid", "seat", "sliding_container", "opens", "closes"]):
+        return "articulated_part_state"
+    if any(token in text for token in ["exits", "leaves", "separates", "remove", "removal", "extraction", "out_from_socket"]):
+        return "removal_or_extraction_state"
+    if any(token in text for token in ["pour", "spout", "plant"]):
+        return "pouring_target_state"
+    if any(token in text for token in ["deformable", "rope", "straighten"]):
+        return "deformable_shape_state"
+    if any(token in text for token in ["scoop", "sweep", "drag", "slide_blade", "tool"]):
+        return "tool_contact_state"
+    if any(token in text for token in ["hole", "peg", "spoke", "socket", "thread", "shape_profile", "insert"]):
+        return "aligned_insertion_or_docking"
+    if any(token in text for token in ["inside", "shelf", "receptacle", "container", "hoop", "bin", "drawer"]):
+        return "placement_inside_or_on_target"
+    if any(token in text for token in ["support", "holder", "rack", "cradle", "dock", "resting", "sits", "hangs"]):
+        return "supported_or_docked_pose"
+    return "task_goal_state"
+
+
+def _goal_state_descriptor(task_key, geometry, affordance, profile=None, raw_goal=None, use_as="query_goal_state"):
+    if isinstance(raw_goal, dict) and raw_goal:
+        transfer_note = (
+            "unseen query success state; prioritize this over retrieved demo goals"
+            if use_as == "query_goal_state"
+            else "seen demo success state; use as an analogy only if compatible with the unseen query goal"
+        )
+        goal = {
+            "goal_state_type": raw_goal.get("goal_state_type") or raw_goal.get("target_pose_type") or "unknown",
+            "manipulated_object": raw_goal.get("manipulated_object") or task_key,
+            "target_object_or_region": raw_goal.get("target_object_or_region") or "unknown",
+            "required_final_relation": (
+                raw_goal.get("required_final_relation")
+                or raw_goal.get("required_spatial_relation")
+                or raw_goal.get("containment_requirement")
+                or "unknown"
+            ),
+            "contact_or_release_target": raw_goal.get("contact_or_release_target") or raw_goal.get("target_object_or_region") or "unknown",
+            "required_motion_constraint": (
+                raw_goal.get("required_motion_constraint")
+                or raw_goal.get("placement_mode")
+                or raw_goal.get("support_type")
+                or "unknown"
+            ),
+            "required_orientation_or_alignment": (
+                raw_goal.get("required_orientation_or_alignment")
+                or raw_goal.get("required_object_orientation")
+                or raw_goal.get("alignment_requirement")
+                or "unknown"
+            ),
+            "release_or_stop_condition": raw_goal.get("release_or_stop_condition") or raw_goal.get("release_condition") or "unknown",
+            "success_check": raw_goal.get("success_check") or raw_goal.get("release_condition") or "unknown",
+            "goal_tags": raw_goal.get("goal_tags") or raw_goal.get("target_pose_tags") or [],
+            "transfer_note": raw_goal.get("transfer_note") or transfer_note,
+        }
+        return goal
+
+    geometry = _canonical_geometry(task_key, geometry, affordance)
+    profile = profile or _interaction_profile(task_key, geometry, affordance)
+    target_relation = _first_label(profile.get("target_relation"), geometry.get("constraint_type", "unknown"))
+    precision_driver = _first_label(profile.get("precision_driver"), geometry.get("alignment_requirement", "unknown"))
+    goal_type = _goal_state_type_from_profile(profile)
+    manipulated_object = geometry.get("manipulated_object") or task_key
+    contact_or_release_target = (
+        geometry.get("target_part")
+        or geometry.get("contact_region")
+        or precision_driver
+        or "unknown"
+    )
+    motion_constraint = (
+        profile.get("axis_constraint")
+        or geometry.get("motion_axis")
+        or profile.get("motion_sequence")
+        or "unknown"
+    )
+    orientation_or_alignment = precision_driver
+    if geometry.get("alignment_requirement") and geometry.get("alignment_requirement") != "unknown":
+        orientation_or_alignment = f"{geometry.get('alignment_requirement')}_alignment:{precision_driver}"
+
+    if goal_type in {"placement_inside_or_on_target", "supported_or_docked_pose", "aligned_insertion_or_docking"}:
+        release_or_stop = f"release only after {target_relation}"
+    elif goal_type in {"removal_or_extraction_state", "articulated_part_state", "control_or_articulation_state", "deformable_shape_state", "tool_contact_state", "pouring_target_state"}:
+        release_or_stop = f"stop when {target_relation}"
+    else:
+        release_or_stop = f"complete when {target_relation}"
+
+    tags = sorted(
+        set(
+            _as_labels(goal_type)
+            + _as_labels(profile.get("interaction_family"))
+            + _as_labels(profile.get("target_relation"))
+            + _as_labels(profile.get("axis_constraint"))
+            + _as_labels(geometry.get("action_primitive"))
+            + _as_labels(geometry.get("constraint_type"))
+        )
+    )
+    transfer_note = (
+        "unseen query success state; prioritize this over retrieved demo goals"
+        if use_as == "query_goal_state"
+        else "seen demo success state; use as an analogy only if compatible with the unseen query goal"
+    )
+    return {
+        "goal_state_type": goal_type,
+        "manipulated_object": manipulated_object,
+        "target_object_or_region": precision_driver if precision_driver != "unknown" else target_relation,
+        "required_final_relation": target_relation,
+        "contact_or_release_target": contact_or_release_target,
+        "required_motion_constraint": _first_label(motion_constraint, "unknown"),
+        "required_orientation_or_alignment": orientation_or_alignment,
+        "release_or_stop_condition": release_or_stop,
+        "success_check": target_relation,
+        "goal_tags": tags,
+        "transfer_note": transfer_note,
+    }
 
 
 def _profile_value_similarity(seen_value, query_value):
@@ -963,23 +1691,75 @@ def _contact_family_similarity(seen_profile, query_profile):
     return 0.35 * _profile_value_similarity(seen_family, query_family)
 
 
+def _plan_tier_for_family(seen_family, query_family):
+    if not seen_family or not query_family:
+        return "unknown", "missing interaction family"
+    if seen_family == query_family:
+        return "exact", "same interaction family"
+
+    spec = PLAN_FAMILY_COMPATIBILITY.get(query_family, {})
+    for tier in ("near", "weak", "blocked"):
+        if seen_family in spec.get(tier, set()):
+            return tier, f"{seen_family} is {tier} for query family {query_family}"
+
+    for group in V3_FAMILY_GROUPS:
+        if seen_family in group and query_family in group:
+            return "near", "shared v3 mechanical family group"
+
+    contact_score = _contact_family_similarity(
+        {"interaction_family": seen_family},
+        {"interaction_family": query_family},
+    )
+    if contact_score >= 0.80:
+        return "near", f"high contact-family compatibility {contact_score:.2f}"
+    if contact_score >= 0.35:
+        return "weak", f"weak contact-family compatibility {contact_score:.2f}"
+    if spec:
+        return "blocked", f"not listed as compatible with query family {query_family}"
+    return "unknown", "no plan compatibility rule"
+
+
+def _plan_compatibility(seen_profile, query_profile):
+    seen_family = _family_name(seen_profile)
+    query_family = _family_name(query_profile)
+    tier, reason = _plan_tier_for_family(seen_family, query_family)
+    return {
+        "tier": tier,
+        "score": PLAN_TIER_SCORES.get(tier, PLAN_TIER_SCORES["unknown"]),
+        "reason": reason,
+        "seen_family": seen_family,
+        "query_family": query_family,
+    }
+
+
+def _plan_score_cap(tier):
+    if tier == "blocked":
+        return float(os.environ.get("XICM_GA_PLAN_BLOCK_CAP", "0.15"))
+    if tier == "weak":
+        return float(os.environ.get("XICM_GA_PLAN_WEAK_CAP", "0.55"))
+    if tier == "unknown":
+        return float(os.environ.get("XICM_GA_PLAN_UNKNOWN_CAP", "0.45"))
+    return None
+
+
 def _field_similarity(a, b, field):
     return _profile_value_similarity(a.get(field), b.get(field))
 
 
 def _mechanical_similarity(seen_profile, query_profile, seen_geometry, query_geometry, seen_affordance, query_affordance):
+    seen_geometry = _canonical_geometry("", seen_geometry, seen_affordance)
+    query_geometry = _canonical_geometry("", query_geometry, query_affordance)
     geometry_score = (
-        0.35 * _field_similarity(seen_geometry, query_geometry, "opening_geometry")
-        + 0.30 * _field_similarity(seen_geometry, query_geometry, "axis_geometry")
-        + 0.20 * _field_similarity(seen_geometry, query_geometry, "clearance_geometry")
-        + 0.15 * _field_similarity(seen_geometry, query_geometry, "part_geometry")
+        0.45 * _field_match_score(seen_geometry, query_geometry, "action_primitive")
+        + 0.15 * _field_match_score(seen_geometry, query_geometry, "motion_type")
+        + 0.15 * _field_match_score(seen_geometry, query_geometry, "motion_axis")
+        + 0.12 * _field_match_score(seen_geometry, query_geometry, "contact_region")
+        + 0.13 * _field_match_score(seen_geometry, query_geometry, "constraint_type")
     )
-    affordance_score = (
-        0.30 * _field_similarity(seen_affordance, query_affordance, "contact_affordance")
-        + 0.30 * _field_similarity(seen_affordance, query_affordance, "motion_affordance")
-        + 0.20 * _field_similarity(seen_affordance, query_affordance, "containment_affordance")
-        + 0.20 * _field_similarity(seen_affordance, query_affordance, "required_contact_region")
-    )
+    seen_action = _first_label(seen_geometry.get("action_primitive"), "")
+    query_action = _first_label(query_geometry.get("action_primitive"), "")
+    if seen_action and query_action and seen_action != query_action and "unknown" not in {seen_action, query_action}:
+        geometry_score = min(geometry_score, ACTION_MISMATCH_SCORE_CAP)
     profile_score = (
         0.38 * _contact_family_similarity(seen_profile, query_profile)
         + 0.20 * _profile_value_similarity(seen_profile.get("target_relation"), query_profile.get("target_relation"))
@@ -987,7 +1767,7 @@ def _mechanical_similarity(seen_profile, query_profile, seen_geometry, query_geo
         + 0.13 * _profile_value_similarity(seen_profile.get("contact_strategy"), query_profile.get("contact_strategy"))
         + 0.12 * _profile_value_similarity(seen_profile.get("axis_constraint"), query_profile.get("axis_constraint"))
     )
-    return max(0.0, min(1.0, 0.55 * profile_score + 0.25 * affordance_score + 0.20 * geometry_score))
+    return max(0.0, min(1.0, 0.55 * profile_score + 0.45 * geometry_score))
 
 
 def _profile_conflict_penalty(seen_profile, query_profile):
@@ -1075,10 +1855,94 @@ def _attention_bias_for_ranked_items(ranked):
     return ranked
 
 
+def _write_retrieval_audit(ranking_metric, query_task, query_profile, ranked):
+    audit_path = os.environ.get("XICM_GA_AUDIT_JSONL")
+    if not audit_path:
+        return
+    top_limit = int(os.environ.get("XICM_GA_AUDIT_TOPK", "20"))
+    tier_counts = {}
+    family_counts = {}
+    top = []
+    for item in ranked[:top_limit]:
+        tier = item.get("compatibility_tier", "not_plan_scored")
+        family = _family_name(item.get("seen_profile", {})) or "unknown"
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        family_counts[family] = family_counts.get(family, 0) + 1
+        top.append(
+            {
+                "rank": len(top) + 1,
+                "task": item.get("task"),
+                "episode_id": item.get("episode_id"),
+                "score": item.get("score"),
+                "raw_score": item.get("raw_score"),
+                "attention_bias": item.get("attention_bias"),
+                "s_dyn": item.get("s_dyn"),
+                "s_geo": item.get("s_geo"),
+                "s_profile": item.get("s_profile"),
+                "s_plan": item.get("s_plan"),
+                "transfer_penalty": item.get("penalty"),
+                "compatibility_tier": tier,
+                "compatibility_reason": item.get("compatibility_reason"),
+                "seen_family": family,
+                "score_cap": item.get("score_cap"),
+            }
+        )
+    record = {
+        "ranking_metric": ranking_metric,
+        "query_task": query_task,
+        "query_family": _family_name(query_profile),
+        "tier_counts": tier_counts,
+        "seen_family_counts": family_counts,
+        "top": top,
+    }
+    try:
+        directory = os.path.dirname(audit_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(audit_path, "a") as handle:
+            handle.write(json.dumps(record) + "\n")
+    except Exception as exc:
+        print(f"WARNING: failed to write retrieval audit {audit_path}: {exc}")
+
+
+def _contact_mode_from_affordance(affordance):
+    grasp = _first_label(affordance.get("grasp_affordance"), "")
+    contact = _first_label(affordance.get("contact_affordance"), "")
+    motion = _first_label(affordance.get("motion_affordance"), "")
+    combined = " ".join([grasp, contact, motion])
+    if any(token in combined for token in ["press", "button"]):
+        return "press_point"
+    if any(token in combined for token in ["push", "surface_contact", "sweep", "slide", "drag"]):
+        return "single_contact"
+    if any(token in combined for token in ["grasp", "pinch", "pull", "twist", "lift", "place", "insert"]):
+        return "grasp_pair"
+    return "region_hint"
+
+
+def _contact_hints_from_affordance(task_key, affordance, use_as):
+    affordance = affordance or {}
+    region = _first_label(affordance.get("required_contact_region"), "unknown")
+    points = affordance.get("preferred_contact_points") or []
+    return {
+        "contact_mode": _contact_mode_from_affordance(affordance),
+        "source_view": "front_rgb_initial",
+        "target_object": _first_label(task_key, "unknown"),
+        "target_part": _normalize_target_part(region),
+        "points_2d_normalized": points,
+        "contact_region_text": region,
+        "candidate_contact_coordinates": [],
+        "use_as": use_as,
+    }
+
+
 def _query_descriptors(task_key, language_goal):
     if task_key in UNSEEN_DESCRIPTOR_RULES:
         item = UNSEEN_DESCRIPTOR_RULES[task_key]
-        return item["geometry"], item["affordance"]
+        affordance = item.get("affordance") or {}
+        return (
+            _canonical_geometry(task_key, item["geometry"], affordance),
+            _contact_hints_from_affordance(task_key, affordance, "unseen_query_contact_region_hint_not_retrieval"),
+        )
     text = language_goal.lower().replace(" ", "_")
     geometry = {
         "manipulated_object": task_key,
@@ -1089,18 +1953,11 @@ def _query_descriptors(task_key, language_goal):
         "clearance_geometry": "unknown",
         "task_relevant_geometric_cues": _normalize_token(text),
     }
-    affordance = {
-        "grasp_affordance": "unknown",
-        "contact_affordance": "unknown",
-        "motion_affordance": "unknown",
-        "containment_affordance": "none",
-        "articulation_affordance": "none",
-        "required_contact_region": "unknown",
-        "preferred_contact_points": [],
-        "precision_requirement": "medium",
-        "failure_sensitive_property": "wrong_contact_point",
-    }
-    return geometry, affordance
+    return _canonical_geometry(task_key, geometry, {}), _contact_hints_from_affordance(
+        task_key,
+        {},
+        "unseen_query_contact_region_hint_not_retrieval",
+    )
 
 
 def _format_value(value):
@@ -1112,9 +1969,56 @@ def _format_value(value):
 def _format_feature_block(title, values, fields):
     lines = [f"{title}:"]
     for field in fields:
-        default = [] if field in {"key_features", "part_geometry", "task_relevant_geometric_cues", "preferred_contact_points"} else "unknown"
+        default = [] if field in {"secondary_parts", "geometry_tags", "points_2d_normalized", "candidate_contact_coordinates", "goal_tags"} else "unknown"
         lines.append(f"- {field}: {_format_value(values.get(field, default))}")
     return "\n".join(lines)
+
+
+def _format_geometry_field_guide():
+    return "\n".join(
+        [
+            "Geometry descriptor field guide:",
+            "- action_primitive: the primitive manipulation verb to transfer first, such as pull, push, twist, press, place, insert, slide, sweep, scoop, or lift.",
+            "- motion_type: the coarse motion family, such as linear, rotational, vertical, planar, or insertion.",
+            "- motion_axis: the primitive movement axis or relation, such as horizontal, vertical, rotational, into_opening, across_surface, or surface_normal.",
+            "- contact_type: how the robot should physically interact, such as grasp, press, or surface_contact.",
+            "- contact_region: the object part or region that should be touched or grasped.",
+            "- constraint_type: the physical constraint that shapes the action, such as joint, slot, hole, container, support_surface, or free_space.",
+            "- alignment_requirement: how much geometric alignment matters before motion; high means orientation/centering is important.",
+            "- execution_clearance_hint, if present: a movement hint for avoiding collision; use it for the final action path, not for deciding demo similarity.",
+        ]
+    )
+
+
+def _format_contact_field_guide():
+    return "\n".join(
+        [
+            "Contact hint field guide:",
+            "- contact_mode: whether the hint is a single contact, grasp pair, press point, or region-level cue.",
+            "- target_object and target_part: the object and part the contact hint refers to.",
+            "- points_2d_normalized: optional image-space points in normalized coordinates; use as visual contact hints for action generation, never as retrieval scores.",
+            "- contact_region_text: short natural-language region name for the intended contact.",
+            "- candidate_contact_coordinates: optional 3D/voxel contact candidates when available.",
+            "- use_as: explains whether the hint is from a seen demo or the unseen query.",
+        ]
+    )
+
+
+def _format_goal_state_field_guide():
+    return "\n".join(
+        [
+            "Goal-state/contact-pose descriptor field guide:",
+            "- h_i describes what the seen demo is trying to finish with; h_j describes the unseen query's required success state.",
+            "- Retrieved demos are action analogies: their object identity and final goal may differ from the unseen query.",
+            "- goal_state_type: broad success family, such as supported_or_docked_pose, placement_inside_or_on_target, aligned_insertion_or_docking, articulated_part_state, control_or_articulation_state, removal_or_extraction_state, tool_contact_state, deformable_shape_state, or pouring_target_state.",
+            "- required_final_relation: the final physical relation that must be true when the task succeeds.",
+            "- target_object_or_region and contact_or_release_target: the target site, object part, or reference region that matters for the final state.",
+            "- required_motion_constraint: the movement, axis, or constraint needed to reach that state.",
+            "- required_orientation_or_alignment: orientation, centering, insertion, docking, or contact alignment needed before release/stop.",
+            "- release_or_stop_condition and success_check: use these to decide when to open the gripper, stop pushing/pulling/rotating, or finish the motion.",
+            "- transfer_note: reminds whether the descriptor is a seen-demo analogy or the unseen-query goal.",
+        ]
+    )
 
 
 def _format_profile_block(title, values):
@@ -1134,6 +2038,8 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
     use_v2 = _is_v2_ranking(ranking_metric)
     use_v3 = _is_v3_ranking(ranking_metric)
     use_v4 = _is_v4_ranking(ranking_metric)
+    use_plan = _is_plan_ranking(ranking_metric)
+    plan_weight = float(os.environ.get("XICM_GA_PLAN_WEIGHT", "0.45")) if use_plan else 0.0
     query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
     query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
     ranked = []
@@ -1142,13 +2048,13 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
         row = review_cache.get((task, episode_id))
         if row is None:
             continue
-        seen_geometry = row.get("geometry_g_i") or {}
-        seen_affordance = row.get("affordance_a_i") or {}
+        seen_affordance = row.get("contact_hints_i") or row.get("affordance_a_i") or {}
+        seen_geometry = _canonical_geometry(task, row.get("geometry_g_i") or {}, seen_affordance)
         s_dyn = 0.0 if sim_span == 0 else (float(similarity[idx]) - sim_min) / sim_span
         s_geo = _geometry_similarity(seen_geometry, query_geometry)
-        s_aff = _affordance_similarity(seen_affordance, query_affordance)
+        s_aff = 0.0
         seen_profile = _interaction_profile(task, seen_geometry, seen_affordance)
-        if use_v3 or use_v4:
+        if use_v3 or use_v4 or use_plan:
             s_profile = _mechanical_similarity(
                 seen_profile,
                 query_profile,
@@ -1161,28 +2067,67 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
         else:
             s_profile = _profile_similarity(seen_profile, query_profile)
             penalty = _profile_conflict_penalty(seen_profile, query_profile) if use_v2 else 0.0
-        score = alpha * s_dyn + beta * s_geo + gamma * s_aff
-        if use_v2 or use_v3 or use_v4:
+        plan_compat = _plan_compatibility(seen_profile, query_profile) if use_plan else {
+            "tier": "not_plan_scored",
+            "score": 0.0,
+            "reason": "",
+            "seen_family": _family_name(seen_profile),
+            "query_family": _family_name(query_profile),
+        }
+        s_plan = plan_compat["score"]
+        seen_goal_state = _goal_state_descriptor(
+            task,
+            seen_geometry,
+            seen_affordance,
+            seen_profile,
+            raw_goal=(
+                row.get("goal_state_h_i")
+                or row.get("target_pose_h_i")
+                or row.get("target_pose_i")
+                or row.get("target_pose_descriptor_i")
+                or row.get("goal_state_descriptor_i")
+            ),
+            use_as="seen_demo_goal_state",
+        )
+        score = alpha * s_dyn + beta * s_geo
+        if use_v2 or use_v3 or use_v4 or use_plan:
             score += delta * s_profile - penalty_weight * penalty
+        if use_plan:
+            score += plan_weight * s_plan
+        raw_score = score
+        score_cap = _plan_score_cap(plan_compat["tier"]) if use_plan else None
+        if score_cap is not None:
+            score = min(score, score_cap)
         ranked.append(
             {
                 "score": score,
+                "raw_score": raw_score,
+                "score_cap": score_cap,
                 "index": idx,
                 "task": task,
+                "episode_id": episode_id,
                 "s_dyn": s_dyn,
                 "s_geo": s_geo,
                 "s_aff": s_aff,
                 "s_profile": s_profile,
+                "s_plan": s_plan,
                 "penalty": penalty,
+                "compatibility_tier": plan_compat["tier"],
+                "compatibility_reason": plan_compat["reason"],
+                "query_family": plan_compat["query_family"],
+                "seen_family": plan_compat["seen_family"],
                 "seen_profile": seen_profile,
+                "seen_goal_state": seen_goal_state,
             }
         )
     ranked.sort(reverse=True, key=lambda item: item["score"])
-    if use_v3 or use_v4:
+    if use_v3 or use_v4 or use_plan:
         ranked = _select_diverse_ranked_items(ranked, top_k)
     else:
         ranked = ranked[:top_k]
-    return _attention_bias_for_ranked_items(ranked)
+    ranked = _attention_bias_for_ranked_items(ranked)
+    _write_retrieval_audit(ranking_metric, query_task, query_profile, ranked)
+    return ranked
 
 class base_task_handler:
     def __init__(self, sim_name_to_real_name):
@@ -1241,9 +2186,10 @@ class base_task_handler:
                     query_affordance,
                     include_geometry=_include_geometry(ranking_metric),
                     include_affordance=_include_affordance(ranking_metric),
-                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric) or _is_v4_ranking(ranking_metric),
+                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric) or _is_v4_ranking(ranking_metric) or _is_plan_ranking(ranking_metric),
                     use_v3=_is_v3_ranking(ranking_metric),
                     use_v4=_is_v4_ranking(ranking_metric),
+                    use_plan=_is_plan_ranking(ranking_metric),
                 )
 
             top_indices = np.argsort(similarity)[::-1]
@@ -2007,14 +2953,15 @@ def _compact_summary_value(value):
 
 
 def _scene_summary(task_instruction, task_key, geometry, affordance, profile):
+    geometry = _canonical_geometry(task_key, geometry, affordance)
     manipulated_object = geometry.get("manipulated_object") or task_key
-    primary_shape = geometry.get("primary_shape") or geometry.get("part_geometry") or "unknown shape"
-    key_geometry = geometry.get("task_relevant_geometric_cues") or geometry.get("key_features") or []
-    action = affordance.get("motion_affordance") or profile.get("motion_sequence") or "unknown"
-    contact = affordance.get("required_contact_region") or affordance.get("contact_affordance") or profile.get("contact_strategy") or "unknown"
-    target_relation = profile.get("target_relation") or geometry.get("opening_geometry") or affordance.get("containment_affordance") or "unknown"
-    axis = profile.get("axis_constraint") or geometry.get("axis_geometry") or "unknown"
-    precision = profile.get("precision_driver") or affordance.get("failure_sensitive_property") or affordance.get("precision_requirement") or "unknown"
+    primary_shape = geometry.get("primary_shape") or "unknown shape"
+    key_geometry = geometry.get("geometry_tags") or []
+    action = geometry.get("action_primitive") or profile.get("motion_sequence") or "unknown"
+    contact = geometry.get("contact_region") or profile.get("contact_strategy") or "unknown"
+    target_relation = geometry.get("constraint_type") or profile.get("target_relation") or "unknown"
+    axis = geometry.get("motion_axis") or profile.get("axis_constraint") or "unknown"
+    precision = geometry.get("alignment_requirement") or profile.get("precision_driver") or "unknown"
     caution = profile.get("transfer_caution") or "match the contact mode before copying coordinates"
     return (
         f"Task '{task_instruction}' manipulates {manipulated_object}. "
@@ -2060,12 +3007,24 @@ def _format_augmented_demo(
             f"Retrieval scores: score={retrieval_item['score']:.4f}, "
             f"S_dyn={retrieval_item['s_dyn']:.4f}, "
             f"S_geo={retrieval_item['s_geo']:.4f}, "
-            f"S_aff={retrieval_item['s_aff']:.4f}, "
             f"S_profile={retrieval_item['s_profile']:.4f}, "
             f"transfer_penalty={retrieval_item['penalty']:.4f}"
             ),
-            "",
         ])
+        if retrieval_item.get("compatibility_tier") not in {None, "not_plan_scored"}:
+            cap = retrieval_item.get("score_cap")
+            cap_text = "none" if cap is None else f"{cap:.4f}"
+            lines.append(
+                "Plan compatibility: "
+                f"tier={retrieval_item.get('compatibility_tier')}, "
+                f"S_plan={retrieval_item.get('s_plan', 0.0):.4f}, "
+                f"raw_score={retrieval_item.get('raw_score', retrieval_item['score']):.4f}, "
+                f"score_cap={cap_text}, "
+                f"seen_family={retrieval_item.get('seen_family', 'unknown')}, "
+                f"query_family={retrieval_item.get('query_family', 'unknown')}, "
+                f"reason={retrieval_item.get('compatibility_reason', '')}"
+            )
+        lines.append("")
     else:
         lines.append("")
     if use_v2 and include_retrieval_metadata:
@@ -2078,10 +3037,27 @@ def _format_augmented_demo(
                 "",
             ]
         )
+    seen_contact_hints = review.get("contact_hints_i") or review.get("affordance_a_i") or {}
+    seen_geometry = _canonical_geometry(task_name, review.get("geometry_g_i") or {}, seen_contact_hints)
     if include_geometry:
-        lines.extend([_format_feature_block("Geometry description g_i", review.get("geometry_g_i") or {}, GEOMETRY_FIELDS), ""])
+        lines.extend([_format_feature_block("Primitive geometry/action descriptor g_i", seen_geometry, GEOMETRY_FIELDS), ""])
+        seen_goal_state = retrieval_item.get("seen_goal_state") or _goal_state_descriptor(
+            task_name,
+            seen_geometry,
+            seen_contact_hints,
+            retrieval_item.get("seen_profile", {}),
+            raw_goal=(
+                review.get("goal_state_h_i")
+                or review.get("target_pose_h_i")
+                or review.get("target_pose_i")
+                or review.get("target_pose_descriptor_i")
+                or review.get("goal_state_descriptor_i")
+            ),
+            use_as="seen_demo_goal_state",
+        )
+        lines.extend([_format_feature_block("Goal-state/contact-pose descriptor h_i", seen_goal_state, GOAL_STATE_FIELDS), ""])
     if include_affordance:
-        lines.extend([_format_feature_block("Affordance description a_i", review.get("affordance_a_i") or {}, AFFORDANCE_FIELDS), ""])
+        lines.extend([_format_feature_block("RoboPoint contact hints c_i", seen_contact_hints, CONTACT_HINT_FIELDS), ""])
     if include_scene_summary:
         lines.extend(
             [
@@ -2089,8 +3065,8 @@ def _format_augmented_demo(
                 _scene_summary(
                     demo["task_instruction"],
                     task_name,
-                    review.get("geometry_g_i") or {},
-                    review.get("affordance_a_i") or {},
+                    seen_geometry,
+                    seen_contact_hints,
                     retrieval_item.get("seen_profile", {}),
                 ),
                 "",
@@ -2166,6 +3142,20 @@ def _format_v4_user_prompt(
     include_affordance=True,
 ):
     query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
+    query_goal_state = _goal_state_descriptor(
+        query_task_key,
+        query_geometry,
+        query_affordance,
+        query_profile,
+        raw_goal=(
+            query_geometry.get("goal_state_h_j")
+            or query_geometry.get("target_pose_h_j")
+            or query_geometry.get("target_pose_j")
+            or query_geometry.get("target_pose")
+            or query_geometry.get("goal_state_descriptor_j")
+        ),
+        use_as="query_goal_state",
+    )
     query_scene_summary = _scene_summary(
         query_task_instruction,
         query_task_key,
@@ -2178,18 +3168,27 @@ def _format_v4_user_prompt(
         "<<<V4_STAGE1_PROMPT>>>",
         f"You will receive {len(ranked)} top-k retrieved seen demonstrations and one unseen query.",
         "",
-        "Your job is to convert the unseen manipulation task into a clean semantic manipulation plan before any 7D actions are predicted.",
+        "Your job is to answer, in simple grounded words, what physical manipulation the Franka Panda robot should perform in the current unseen scene.",
+        "Convert the unseen task into a clean semantic manipulation plan before any 7D actions are predicted.",
         "",
         "Use the retrieved seen demonstrations only as analogies for contact mode, target relation, motion direction, and gripper behavior. Do not copy their 7D coordinates in this stage.",
+        "Their object identity and final goal may differ from the unseen query; prioritize the unseen current observation, primitive geometry/signature, and h_j goal-state/contact-pose descriptor when they conflict with a retrieved demo.",
         "",
         "Important rules:",
         "- Do not output 7D actions in Stage 1.",
         "- Do not use unseen future observations, unseen ground-truth actions, after-states, or unseen demonstrations.",
         "- Prefer descriptors and scene summaries that match the unseen contact mechanics over demos with superficially similar object names.",
-        "- Output exactly one compact JSON object with these fields: target_object, reference_object, target_location_relation, target_orientation, action_primitive, motion_direction, contact_point, gripper_plan, success_relation, constraints, demo_use_hint.",
+        "- h_i is each seen demo's final success state; h_j is the unseen query's final success state. Use h_i only as an analogy and obey h_j.",
+        "- Copy the target object's current coordinate exactly from the Current observation into target_current_coordinate.",
+        "- Choose the active reference part from the Current observation, not a generic support object. For example, use holder/peg/post instead of stand_base when the task requires placing a hole over a stand.",
+        "- Copy the active reference part's coordinate exactly from the Current observation into reference_coordinate.",
+        "- Make action_primitive and motion_direction concrete, such as pull straight outward, rotate clockwise, lift then place, slide along +x, press downward, align over vertical post, or insert along socket axis.",
+        "- Output exactly one compact JSON object with these fields: target_object, target_current_coordinate, reference_object, active_reference_part, reference_coordinate, target_location_relation, target_orientation, action_primitive, motion_direction, contact_point, gripper_plan, success_relation, constraints, demo_use_hint.",
         "",
         "Retrieved seen demonstrations summarized for semantic transfer:",
     ]
+    if include_geometry:
+        stage1.extend(["", _format_goal_state_field_guide(), ""])
 
     for rank, item in enumerate(ranked, start=1):
         selected_idx = item["index"]
@@ -2225,9 +3224,10 @@ def _format_v4_user_prompt(
         ]
     )
     if include_geometry:
-        stage1.extend([_format_feature_block("Geometry description g_j", query_geometry, GEOMETRY_FIELDS), ""])
+        stage1.extend([_format_feature_block("Primitive geometry/action descriptor g_j", query_geometry, GEOMETRY_FIELDS), ""])
+        stage1.extend([_format_feature_block("Goal-state/contact-pose descriptor h_j", query_goal_state, GOAL_STATE_FIELDS), ""])
     if include_affordance:
-        stage1.extend([_format_feature_block("Affordance description a_j", query_affordance, AFFORDANCE_FIELDS), ""])
+        stage1.extend([_format_feature_block("RoboPoint contact hints c_j", query_affordance, CONTACT_HINT_FIELDS), ""])
     stage1.extend(
         [
             _format_profile_block("Precise interaction signature p_j", query_profile),
@@ -2244,13 +3244,18 @@ def _format_v4_user_prompt(
         f"You will now receive the same {len(ranked)} retrieved seen demonstrations with their paper-faithful per-key-action observation/action trajectories.",
         "",
         "Your job is to use the Stage 1 semantic manipulation plan as a clean intent bottleneck, then predict the unseen task's key 7D action sequence.",
+        "Follow the VLA-style question directly: what action should the robot take to complete the task from the current observation?",
         "",
         "Important rules:",
         "- Each seen demonstration includes per-key-action observations paired with the corresponding 7D action.",
         "- The unseen query includes only the current/initial observation and task instruction; use the inserted Stage 1 plan for descriptor-derived intent.",
         "- Do not use unseen future observations, unseen ground-truth actions, after-states, or unseen demonstrations.",
         "- Adapt one or a few seen trajectory rhythms that match the Stage 1 plan; do not average together conflicting demos.",
-        "- Preserve the X-ICM output format: only a Python-style list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].",
+        "- First write relative_action_sketch: short simple motion phrases such as approach target, close gripper, lift +z, move toward reference_coordinate, align with axis, lower/place, release, retreat.",
+        "- The relative_action_sketch must be scene-relative and contact-aware. It should mention target/reference/axis directions, gripper open/close timing, and whether the task is pull, push, press, rotate, insert, place, slide, scoop, or lift.",
+        "- Then use that relative_action_sketch to produce key_actions_7d. The 7D actions must be integer lists [x, y, z, roll, pitch, yaw, gripper]. The 7th value is binary: 1=open, 0=closed.",
+        "- Do not put numeric 7D-like lists inside relative_action_sketch; put all final action numbers only in key_actions_7d.",
+        "- Return only one compact JSON object with exactly these fields: relative_action_sketch, key_actions_7d.",
         "",
         "Retrieved seen demonstrations with key observation-action trajectories:",
     ]
@@ -2292,9 +3297,10 @@ def _format_v4_user_prompt(
     stage2.extend(
         [
             "<<<V4_STAGE2_PLAN_INSERT_HERE>>>",
-            "The agent will insert the Stage 1 semantic manipulation plan here before asking for the final 7D actions.",
+            "The agent will insert the Stage 1 semantic manipulation plan here before asking for the relative sketch and final 7D actions.",
             "",
-            "After reading the inserted semantic plan, predict the key 7D action sequence for the unseen task. Return only a Python-style list of 7D action lists:",
+            "After reading the inserted semantic plan, return only this JSON shape:",
+            '{"relative_action_sketch":["approach target ...","close gripper ...","move toward reference ..."],"key_actions_7d":[[x,y,z,roll,pitch,yaw,gripper],...]}',
         ]
     )
     return "\n".join(stage1 + [""] + stage2)
@@ -2313,6 +3319,7 @@ def _format_augmented_user_prompt(
     use_v2=False,
     use_v3=False,
     use_v4=False,
+    use_plan=False,
 ):
     if use_v4:
         return _format_v4_user_prompt(
@@ -2328,17 +3335,39 @@ def _format_augmented_user_prompt(
         )
 
     query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
+    query_goal_state = _goal_state_descriptor(
+        query_task_key,
+        query_geometry,
+        query_affordance,
+        query_profile,
+        raw_goal=(
+            query_geometry.get("goal_state_h_j")
+            or query_geometry.get("target_pose_h_j")
+            or query_geometry.get("target_pose_j")
+            or query_geometry.get("target_pose")
+            or query_geometry.get("goal_state_descriptor_j")
+        ),
+        use_as="query_goal_state",
+    )
     lines = [
         f"You will receive {len(ranked)} top-k retrieved seen demonstrations from the AGNOSTOS seen-task training set. Use all of them as in-context examples for the current unseen query.",
         "",
-        "Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the retrieved seen demonstrations using action trends, geometry, and affordances.",
+        "The retrieved demonstrations were selected because they may share similar action primitive, motion, contact-region, or geometric constraint patterns. Their object identity and final goal may be different from the unseen query.",
+        "Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the retrieved seen demonstrations using action trends, primitive manipulation geometry, and the unseen goal-state/contact-pose descriptor.",
         "",
         "Important rules:",
         "- Each seen demonstration includes per-key-action observations paired with the corresponding 7D action.",
-        "- The unseen query includes only the current/initial observation, task instruction, and the descriptor types used by this ablation.",
+        "- Treat each retrieved seen demonstration as an analogy, not as the exact target. Transfer the action rhythm only when it is compatible with the unseen query.",
+        "- The unseen query includes only the current/initial observation, task instruction, primitive geometry/action descriptor, and goal-state/contact-pose descriptor.",
+        "- RoboPoint/oracle contact points, when present, are final-action hints only; they were not used to retrieve the demonstrations.",
+        "- The unseen h_j descriptor is the desired final success state. If a seen h_i goal conflicts with h_j, follow h_j and use that seen demo only as weak motion evidence.",
         "- Do not use unseen demonstrations, unseen future frames, unseen ground-truth actions, or after-states.",
         "- Preserve the X-ICM output format: only a list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].",
     ]
+    if include_geometry:
+        lines.extend(["", _format_geometry_field_guide(), "", _format_goal_state_field_guide()])
+    if include_affordance:
+        lines.extend(["", _format_contact_field_guide()])
     if use_v2:
         lines.extend(
             [
@@ -2354,6 +3383,14 @@ def _format_augmented_user_prompt(
                 "- For v3, prioritize contact-mode compatibility over raw visual/dynamic similarity when they disagree.",
                 "- Prefer demos whose interaction family, target relation, required contact region, and axis constraint match the unseen query.",
                 "- If retrieved demos repeat the same wrong contact mode, use them only as weak coordinate hints.",
+            ]
+        )
+    if use_plan:
+        lines.extend(
+            [
+                "- Plan compatibility was applied during retrieval. Exact and near demos are primary analogies; weak demos are fallback evidence only.",
+                "- If a demo is marked blocked, do not copy its action rhythm or final relation. Use it only for generic coordinate scale if no better demo covers that detail.",
+                "- The query interaction family and h_j goal-state/contact-pose descriptor are authoritative when any retrieved h_i conflicts with them.",
             ]
         )
     lines.append("")
@@ -2386,9 +3423,10 @@ def _format_augmented_user_prompt(
         "",
     ])
     if include_geometry:
-        lines.extend([_format_feature_block("Geometry description g_j", query_geometry, GEOMETRY_FIELDS), ""])
+        lines.extend([_format_feature_block("Primitive geometry/action descriptor g_j", query_geometry, GEOMETRY_FIELDS), ""])
+        lines.extend([_format_feature_block("Goal-state/contact-pose descriptor h_j", query_goal_state, GOAL_STATE_FIELDS), ""])
     if include_affordance:
-        lines.extend([_format_feature_block("Affordance description a_j", query_affordance, AFFORDANCE_FIELDS), ""])
+        lines.extend([_format_feature_block("RoboPoint contact hints c_j", query_affordance, CONTACT_HINT_FIELDS), ""])
     if use_v2:
         lines.extend([_format_profile_block("Precise interaction signature p_j", query_profile), ""])
     if use_v3:

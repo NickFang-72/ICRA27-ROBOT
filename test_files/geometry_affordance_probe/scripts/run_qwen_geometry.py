@@ -5,7 +5,38 @@ import torch
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 from qwen_vl_utils import process_vision_info
 
-GEOMETRY_PROMPT = """You are extracting geometry for robot manipulation retrieval.\nReturn ONLY valid JSON. Do not include markdown.\nUse the schema below and keep values concrete, short, and visually grounded.\n\nSchema:\n{\n  \"primary_shape\": string,\n  \"part_geometry\": [string],\n  \"size\": \"small|medium|large|unknown\",\n  \"aspect_ratio\": string,\n  \"orientation\": string,\n  \"front_face_direction\": string,\n  \"pose_relation\": string,\n  \"opening_geometry\": string,\n  \"axis_geometry\": string,\n  \"symmetry\": string,\n  \"clearance_geometry\": string,\n  \"task_relevant_geometric_cues\": [string],\n  \"uncertain_fields\": [string]\n}\n\nTask instruction: {task}\nDescribe only geometric features visible or strongly implied by the current observations.\n"""
+GEOMETRY_PROMPT = """You are extracting a primitive manipulation-geometry descriptor for robot demo retrieval.
+Return ONLY valid JSON. Do not include markdown.
+
+Goal:
+Describe the object, part, contact region, action primitive, and mechanical constraint needed for the task.
+Use only compact primitive labels. Do not describe camera-relative directions such as left, right, front, back, or facing upward.
+Only use coarse motion geometry: horizontal, vertical, rotational, into_opening, across_surface, surface_normal, none, unknown.
+If unsure, use "unknown" rather than guessing.
+
+Schema:
+{
+  "manipulated_object": string,
+  "object_category": "rigid_object|articulated_or_control|alignment_target|receptacle_or_support|elongated_or_tool|deformable|unknown",
+  "primary_shape": "round_object|box_like|thin_flat_object|elongated_tool|button|peg|irregular|unknown",
+  "target_part": "handle|lid|rim|knob|button_top|slot|hole|opening|body|edge|spout|socket|surface|unknown",
+  "secondary_parts": [string],
+  "action_primitive": "push|pull|press|twist|lift|place|insert|slide|sweep|stack|drag|scoop|pour|none|unknown",
+  "motion_type": "linear|rotational|vertical|planar|insertion|none|unknown",
+  "motion_axis": "horizontal|vertical|rotational|into_opening|across_surface|surface_normal|none|unknown",
+  "contact_type": "grasp|pinch|press|surface_contact|tool_contact|none|unknown",
+  "contact_region": string,
+  "constraint_type": "slot|hole|container|joint|support_surface|surface_target|free_space|none|unknown",
+  "alignment_requirement": "none|low|medium|high|unknown",
+  "state": "open|closed|attached|detached|inside|on_surface|free|unknown",
+  "geometry_tags": [string],
+  "execution_clearance_hint": "none|open_path|narrow_path|swing_path|requires_lift|requires_slide_under|unknown"
+}
+
+Task instruction: {task}
+Use the current observation images and task instruction.
+Return the descriptor JSON only.
+"""
 
 def clean_json(text):
     text = text.strip()
@@ -61,6 +92,8 @@ def main():
         generated_trimmed = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated)]
         decoded = processor.batch_decode(generated_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         parsed, raw = clean_json(decoded)
+        if isinstance(parsed, dict):
+            parsed.pop("short_rationale", None)
         out = {
             "demo_id": demo["id"],
             "task": demo.get("task"),

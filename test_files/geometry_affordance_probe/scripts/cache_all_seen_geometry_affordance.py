@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Cache geometry and affordance descriptors for all AGNOSTOS seen demos.
 
-This is the full-scale version of the geometry/affordance pilot. It builds a
-manifest from the seen-task train JSON, runs Qwen2.5-VL for geometry, runs
-RoboPoint for affordance/contact points, normalizes the outputs into retrieval
+This is the full-scale version of the geometry/contact-hint pilot. It builds a
+manifest from the seen-task train JSON, runs Qwen2.5-VL for primitive geometry,
+runs RoboPoint for optional contact points, normalizes outputs into review
 fields, and writes a progress file that can be watched during long CAIR runs.
 """
 
@@ -23,44 +23,63 @@ from pathlib import Path
 from typing import Any
 
 
-GEOMETRY_PROMPT = """You are extracting geometry for robot manipulation retrieval.
+GEOMETRY_PROMPT = """You are extracting a primitive manipulation-geometry descriptor for robot demo retrieval.
 Return ONLY valid JSON. Do not include markdown.
-Use the schema below and keep values concrete, short, and visually grounded.
+
+Goal:
+Describe the object, part, contact region, action primitive, and mechanical constraint needed for the task.
+Use only compact primitive labels. Do not describe camera-relative directions such as left, right, front, back, or facing upward.
+Only use coarse motion geometry: horizontal, vertical, rotational, into_opening, across_surface, surface_normal, none, unknown.
+If unsure, use "unknown" rather than guessing.
 
 Schema:
 {
-  "primary_shape": string,
-  "part_geometry": [string],
-  "size": "small|medium|large|unknown",
-  "aspect_ratio": string,
-  "orientation": string,
-  "front_face_direction": string,
-  "pose_relation": string,
-  "opening_geometry": string,
-  "axis_geometry": string,
-  "symmetry": string,
-  "clearance_geometry": string,
-  "task_relevant_geometric_cues": [string],
-  "uncertain_fields": [string]
+  "manipulated_object": string,
+  "object_category": "rigid_object|articulated_or_control|alignment_target|receptacle_or_support|elongated_or_tool|deformable|unknown",
+  "primary_shape": "round_object|box_like|thin_flat_object|elongated_tool|button|peg|irregular|unknown",
+  "target_part": "handle|lid|rim|knob|button_top|slot|hole|opening|body|edge|spout|socket|surface|unknown",
+  "secondary_parts": [string],
+  "action_primitive": "push|pull|press|twist|lift|place|insert|slide|sweep|stack|drag|scoop|pour|none|unknown",
+  "motion_type": "linear|rotational|vertical|planar|insertion|none|unknown",
+  "motion_axis": "horizontal|vertical|rotational|into_opening|across_surface|surface_normal|none|unknown",
+  "contact_type": "grasp|pinch|press|surface_contact|tool_contact|none|unknown",
+  "contact_region": string,
+  "constraint_type": "slot|hole|container|joint|support_surface|surface_target|free_space|none|unknown",
+  "alignment_requirement": "none|low|medium|high|unknown",
+  "state": "open|closed|attached|detached|inside|on_surface|free|unknown",
+  "geometry_tags": [string],
+  "execution_clearance_hint": "none|open_path|narrow_path|swing_path|requires_lift|requires_slide_under|unknown"
 }
 
 Task instruction: {task}
-Describe only geometric features visible or strongly implied by the current observations.
+Use the current observation images and task instruction.
+Return the descriptor JSON only.
 """
 
 
 QUESTION_TEMPLATE = """<image>
 Task instruction: {task}
-For robot manipulation, identify the best visible contact or grasp affordance points for accomplishing this task. Return several normalized image keypoints as a list of tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region and motion affordance."""
+Primitive action: {action_primitive}
+Contact mode: {contact_mode}
+Target object: {target_object}
+Target part: {target_part}
+
+For robot manipulation, identify the best visible contact points for accomplishing this task.
+If contact_mode is single_contact, return one normalized image point.
+If contact_mode is grasp_pair, return two normalized image points for the two parallel-gripper finger contacts when visible.
+If the contact is not visible or unreliable, return no points and say none.
+Use normalized tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region only."""
 
 
-AFFORDANCE_SCHEMA = {
-    "grasp_affordance": "handle_grasp | knob_grasp | rim_grasp | body_grasp | edge_grasp | pinch | none | unknown",
-    "contact_affordance": "push_surface | pull_handle | lift_top | rotate_part | slide_part | insert_object | lift_and_place | stack_object | drag_object | unknown",
-    "motion_affordance": "push | pull | lift | rotate | slide | twist | insert | scoop | pour | stack | drag | place | unknown",
-    "required_contact_region": "handle | knob | rim | top | side | front_face | free_end | object_body | unknown",
-    "preferred_contact_points": "RoboPoint normalized image points, if produced",
+CONTACT_HINT_SCHEMA = {
+    "contact_mode": "single_contact | grasp_pair | none",
+    "source_view": "front_rgb_initial",
+    "target_object": "Object named by the primitive geometry descriptor",
+    "target_part": "Part/contact region named by the primitive geometry descriptor",
+    "points_2d_normalized": "RoboPoint normalized image points, if produced",
+    "contact_region_text": "Short RoboPoint phrase naming the contact region",
     "raw_robopoint_text": "Original RoboPoint answer",
+    "source_role": "keypoint_contact_hint_only",
 }
 
 
@@ -423,25 +442,227 @@ def infer_manipulated_object(task: str) -> str:
     return str(TASK_RULES.get(task, {}).get("object", "unknown"))
 
 
-def infer_affordance(task: str, points: list[list[float]], raw_text: str | None) -> dict[str, Any]:
-    spec = {
-        "grasp_affordance": "unknown",
-        "contact_affordance": "unknown",
-        "motion_affordance": "unknown",
-        "support_affordance": "none",
-        "containment_affordance": "none",
-        "articulation_affordance": "none",
-        "required_contact_region": "unknown",
-        "preferred_contact_points": points,
-        "precision_requirement": "medium",
-        "force_requirement": "medium",
-        "failure_sensitive_property": "wrong_contact_point",
+def infer_action_primitive(task: str) -> str:
+    if task == "push_buttons":
+        return "press"
+    if task == "sweep_to_dustpan_of_size":
+        return "sweep"
+    motion = str(TASK_RULES.get(task, {}).get("affordance", {}).get("motion_affordance", "unknown"))
+    return {
+        "rotate": "twist",
+        "insert_then_twist": "insert",
+        "lift_then_insert": "insert",
+        "lift_then_place": "place",
+        "lift_and_place": "place",
+        "push": "push",
+    }.get(motion, motion)
+
+
+def infer_target_part(task: str) -> str:
+    region = str(TASK_RULES.get(task, {}).get("affordance", {}).get("required_contact_region", "unknown"))
+    if "body" in region:
+        return "body"
+    if "side" in region or "surface" in region:
+        return "surface"
+    if "handle" in region:
+        return "handle"
+    if "knob" in region:
+        return "knob"
+    if "rim" in region:
+        return "rim"
+    if "button" in region:
+        return "button_top"
+    if "edge" in region:
+        return "edge"
+    if "slot" in region:
+        return "slot"
+    if "hole" in region or "socket" in region:
+        return "hole"
+    if "opening" in region:
+        return "opening"
+    return region
+
+
+def infer_contact_mode(task: str) -> str:
+    action = infer_action_primitive(task)
+    if action in {"push", "press", "slide", "sweep", "drag"}:
+        return "single_contact"
+    if action in {"pull", "twist", "lift", "place", "insert", "stack", "scoop", "pour"}:
+        return "grasp_pair"
+    return "none"
+
+
+def infer_object_category(task: str, geometry: dict[str, Any], features: list[str]) -> str:
+    text = " ".join([task, json.dumps(geometry or {}, sort_keys=True), " ".join(features)]).lower()
+    if any(token in text for token in ["drawer", "door", "lid", "hinge", "knob", "tap", "switch", "button", "jar"]):
+        return "articulated_or_control"
+    if any(token in text for token in ["slot", "hole", "socket", "peg", "shape_sorter"]):
+        return "alignment_target"
+    if any(token in text for token in ["cupboard", "safe", "dustpan", "shelf", "rack", "container"]):
+        return "receptacle_or_support"
+    if any(token in text for token in ["spatula", "knife", "broom", "tool", "handle"]):
+        return "elongated_or_tool"
+    return "rigid_object"
+
+
+def infer_primary_shape(task: str, geometry: dict[str, Any], features: list[str]) -> str:
+    text = " ".join([task, json.dumps(geometry or {}, sort_keys=True), " ".join(features)]).lower()
+    if task == "push_buttons":
+        return "button"
+    if task == "insert_onto_square_peg":
+        return "peg"
+    if task in {"close_jar", "light_bulb_in"}:
+        return "round_object"
+    if task in {"open_drawer", "put_item_in_drawer", "put_money_in_safe", "put_groceries_in_cupboard", "place_shape_in_shape_sorter", "slide_block_to_color_target"}:
+        return "box_like"
+    if task == "sweep_to_dustpan_of_size":
+        return "thin_flat_object"
+    if task == "turn_tap":
+        return "elongated_tool"
+    if any(token in text for token in ["button"]):
+        return "button"
+    if any(token in text for token in ["peg"]):
+        return "peg"
+    if any(token in text for token in ["drawer", "safe", "cupboard", "block", "box", "rectangular", "cube"]):
+        return "box_like"
+    if any(token in text for token in ["money", "thin", "flat", "plate"]):
+        return "thin_flat_object"
+    if any(token in text for token in ["tap", "handle", "spatula", "tool", "sweeping"]):
+        return "elongated_tool"
+    if any(token in text for token in ["jar", "bulb", "round", "circular", "cylinder", "cylindrical", "rim"]):
+        return "round_object"
+    if any(token in text for token in ["shape_sorter", "shape_profile", "irregular"]):
+        return "irregular"
+    return "unknown"
+
+
+def normalize_state(value: Any) -> str:
+    state = str(value or "").strip().lower().replace(" ", "_")
+    if state in {"open", "closed", "attached", "detached", "inside", "on_surface", "free", "unknown"}:
+        return state
+    if "open" in state:
+        return "open"
+    if "closed" in state:
+        return "closed"
+    if "attached" in state or "grasp" in state or "held" in state:
+        return "attached"
+    if "inside" in state:
+        return "inside"
+    if "surface" in state:
+        return "on_surface"
+    if "free" in state:
+        return "free"
+    return "unknown"
+
+
+def infer_contact_hints(task: str, points: list[list[float]], raw_text: str | None, vision_tower_note: str | None = None) -> dict[str, Any]:
+    contact_mode = infer_contact_mode(task)
+    if contact_mode == "single_contact":
+        points = points[:1]
+    elif contact_mode == "grasp_pair":
+        points = points[:2]
+    else:
+        points = []
+    hints = {
+        "contact_mode": contact_mode,
+        "source_view": "front_rgb_initial",
+        "target_object": infer_manipulated_object(task),
+        "target_part": infer_target_part(task),
+        "points_2d_normalized": points,
+        "contact_region_text": infer_target_part(task),
         "raw_robopoint_text": raw_text,
+        "source_model": "RoboPoint",
+        "source_role": "keypoint_contact_hint_only",
+        "use_as": "final_prompt_contact_hint_only_not_retrieval_score",
     }
-    if task in TASK_RULES:
-        spec.update(TASK_RULES[task]["affordance"])
-    spec["source_note"] = "RoboPoint produced the contact/keypoint coordinates; symbolic affordance fields are normalized from the task instruction so the retrieval file has concrete labels instead of placeholders."
-    return spec
+    if vision_tower_note:
+        hints["vision_tower_note"] = vision_tower_note
+    return hints
+
+
+def infer_primitive_geometry(task: str, geometry: dict[str, Any]) -> dict[str, Any]:
+    # The seen task label is the reliable source for the primitive. Qwen often
+    # sees the contact shape correctly but confuses nearby primitives.
+    action = str(infer_action_primitive(task) or geometry.get("action_primitive") or "unknown")
+    features = infer_geometry_key_features(task, geometry)
+    target_part = str(geometry.get("target_part") or infer_target_part(task) or "unknown")
+    if target_part not in {"handle", "lid", "rim", "knob", "button_top", "slot", "hole", "opening", "body", "edge", "spout", "socket", "surface", "unknown"}:
+        target_part = infer_target_part(task)
+    axis = str(geometry.get("axis_geometry") or geometry.get("motion_axis") or "unknown")
+    opening = str(geometry.get("opening_geometry") or geometry.get("constraint_type") or "unknown")
+
+    if action in {"twist", "rotate"} or "rotat" in axis or "tilt" in axis:
+        motion_type = "rotational"
+        motion_axis = "rotational"
+    elif action == "insert":
+        motion_type = "insertion"
+        motion_axis = "into_opening"
+    elif action in {"place", "stack", "lift", "pour"}:
+        motion_type = "vertical"
+        motion_axis = "vertical"
+    elif action in {"slide", "sweep", "drag", "scoop"}:
+        motion_type = "planar"
+        motion_axis = "across_surface"
+    elif action == "press":
+        motion_type = "linear"
+        motion_axis = "surface_normal"
+    elif action in {"push", "pull"}:
+        motion_type = "linear"
+        motion_axis = "horizontal"
+    else:
+        motion_type = str(geometry.get("motion_type") or "unknown")
+        motion_axis = str(geometry.get("motion_axis") or "unknown")
+
+    if action in {"twist", "rotate"}:
+        constraint_type = "joint"
+    elif any(token in features for token in ["hinge", "sliding_axis", "rotational_axis"]):
+        constraint_type = "joint"
+    elif "slot" in opening:
+        constraint_type = "slot"
+    elif "hole" in opening or "socket" in opening:
+        constraint_type = "hole"
+    elif "opening" in opening:
+        constraint_type = "container"
+    elif any(token in features for token in ["slot", "hole"]):
+        constraint_type = "slot" if "slot" in features else "hole"
+    elif any(token in features for token in ["open_container", "hollow"]):
+        constraint_type = "container"
+    else:
+        constraint_type = "support_surface" if action in {"place", "stack"} else "none"
+
+    if any(token in features for token in ["alignment_sensitive", "slot", "hole"]):
+        alignment = "high"
+    elif any(token in features for token in ["target_region", "rim"]):
+        alignment = "medium"
+    else:
+        alignment = "low"
+
+    contact_type = {
+        "press": "press",
+        "push": "surface_contact",
+        "slide": "surface_contact",
+        "sweep": "surface_contact",
+        "drag": "surface_contact",
+        "scoop": "tool_contact",
+    }.get(action, "grasp" if action not in {"none", "unknown"} else "unknown")
+
+    return {
+        "manipulated_object": str(geometry.get("manipulated_object") or infer_manipulated_object(task)),
+        "object_category": str(geometry.get("object_category") or infer_object_category(task, geometry, features)),
+        "primary_shape": infer_primary_shape(task, geometry, features),
+        "target_part": target_part,
+        "secondary_parts": unique(geometry.get("secondary_parts") or geometry.get("part_geometry") or []),
+        "action_primitive": action,
+        "motion_type": motion_type,
+        "motion_axis": motion_axis,
+        "contact_type": contact_type,
+        "contact_region": str(geometry.get("contact_region") or target_part),
+        "constraint_type": constraint_type,
+        "alignment_requirement": str(geometry.get("alignment_requirement") or alignment),
+        "state": normalize_state(geometry.get("state") or geometry.get("pose_relation") or "unknown"),
+        "geometry_tags": unique(features),
+        "execution_clearance_hint": str(geometry.get("execution_clearance_hint") or geometry.get("clearance_geometry") or "unknown"),
+    }
 
 
 def geometry_path(demo: dict[str, Any]) -> Path:
@@ -486,6 +707,7 @@ def update_progress(root: Path, manifest: dict[str, Any], stage: str, current_de
         "updated_at": now_iso(),
         "current_stage": stage,
         "current_demo": current_demo,
+        "geometry_only": bool(manifest.get("geometry_only")),
         **progress_counts(root, manifest),
     }
     if previous.get("errors") and stage != "manifest_built":
@@ -516,13 +738,16 @@ def print_status(root: Path) -> None:
     progress = read_json(root / "progress.json", {})
     manifest = read_json(root / "manifest.json", {"selected": []})
     counts = progress_counts(root, manifest)
+    geometry_only = bool(progress.get("geometry_only") or manifest.get("geometry_only"))
     total = counts["total_demos"]
     print(f"root: {root}")
     print(f"stage: {progress.get('current_stage', 'unknown')}")
     print(f"current_demo: {progress.get('current_demo', '')}")
     print(f"updated_at: {progress.get('updated_at', 'never')}")
+    print(f"geometry_only: {geometry_only}")
     print(f"geometry   {progress_bar(counts['geometry_done'], total)}")
-    print(f"affordance {progress_bar(counts['affordance_done'], total)}")
+    if not geometry_only:
+        print(f"affordance {progress_bar(counts['affordance_done'], total)}")
     print(f"combined   {progress_bar(counts['combined_done'], total)}")
     if progress.get("errors"):
         print("recent_errors:")
@@ -561,6 +786,40 @@ def image_for_camera(episode_path: Path, camera: str) -> Path | None:
     return images[0] if images else None
 
 
+def geometry_view_images_from_episode(episode_path: Path) -> dict[str, str]:
+    front = image_for_camera(episode_path, "front_rgb")
+    overhead = image_for_camera(episode_path, "overhead_rgb")
+    wrist = image_for_camera(episode_path, "wrist_rgb")
+    views: dict[str, str] = {}
+    if front is not None:
+        views["front"] = str(front)
+    if overhead is not None:
+        views["overhead"] = str(overhead)
+    elif wrist is not None:
+        views["overhead"] = str(wrist)
+    return views
+
+
+def geometry_view_images(demo: dict[str, Any]) -> dict[str, str]:
+    views = demo.get("geometry_view_images")
+    if isinstance(views, dict) and views:
+        return {str(key): str(value) for key, value in views.items() if value}
+
+    episode_path = demo.get("episode_path")
+    if episode_path:
+        inferred = geometry_view_images_from_episode(Path(episode_path))
+        if inferred:
+            return inferred
+
+    images = demo.get("review_images") or demo.get("absolute_images") or []
+    if not images:
+        return {}
+    fallback = {"front": str(images[0])}
+    if len(images) > 1:
+        fallback["overhead"] = str(images[1])
+    return fallback
+
+
 def build_episode_manifest(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root)
     seen_root = Path(args.data_root) / "seen_tasks"
@@ -582,12 +841,11 @@ def build_episode_manifest(args: argparse.Namespace) -> dict[str, Any]:
         )
         for episode_path in episode_dirs:
             episode_id = episode_id_from_episode_path(str(episode_path))
-            front = image_for_camera(episode_path, "front_rgb")
-            wrist = image_for_camera(episode_path, "wrist_rgb")
-            images = [str(path) for path in [front, wrist] if path is not None]
+            views = geometry_view_images_from_episode(episode_path)
+            images = [views[key] for key in ["front", "overhead"] if key in views]
             if not images:
                 if len(missing) < 100:
-                    missing.append({"episode_path": str(episode_path), "reason": "missing front_rgb/wrist_rgb images"})
+                    missing.append({"episode_path": str(episode_path), "reason": "missing front_rgb/overhead_rgb images"})
                 continue
             demo_id = f"{task}_episode{episode_id}" if episode_id is not None else f"{task}_{episode_path.name}"
             scene_id = f"{task}:episode{episode_id}" if episode_id is not None else demo_id
@@ -601,6 +859,7 @@ def build_episode_manifest(args: argparse.Namespace) -> dict[str, Any]:
                 "relative_images": [str(Path(path).relative_to(Path(args.data_root))) for path in images],
                 "absolute_images": images,
                 "review_images": images,
+                "geometry_view_images": views,
                 "images_exist": [Path(path).exists() for path in images],
                 "episode_path": str(episode_path),
                 "frame_index": 0,
@@ -624,6 +883,7 @@ def build_episode_manifest(args: argparse.Namespace) -> dict[str, Any]:
         "manifest_source": "episodes",
         "data_root": args.data_root,
         "train_json": args.train_json,
+        "geometry_only": args.geometry_only,
         "all_train_rows": False,
         "dedupe_rule": "episode folder scan: one descriptor per seen demonstration episode",
         "candidate_rows_before_dedup": len(selected),
@@ -664,6 +924,11 @@ def build_train_json_manifest(args: argparse.Namespace) -> dict[str, Any]:
 
         episode_path = episode_path_from_images(absolute_images)
         episode_id = episode_id_from_episode_path(episode_path)
+        views = geometry_view_images_from_episode(Path(episode_path)) if episode_path else {}
+        if not views and absolute_images:
+            views = {"front": absolute_images[0]}
+            if len(absolute_images) > 1:
+                views["overhead"] = absolute_images[1]
         scene_id = f"{task}:episode{episode_id}" if episode_id is not None else demo_id
         demo_dir_name = f"episode{episode_id}" if episode_id is not None else demo_id
         demo_dir = root / "demos" / task / demo_dir_name
@@ -675,9 +940,10 @@ def build_train_json_manifest(args: argparse.Namespace) -> dict[str, Any]:
             "episode_id": episode_id,
             "language_description": item.get("language_description", ""),
             "relative_images": relative_images,
-            "absolute_images": absolute_images,
-            "review_images": absolute_images,
-            "images_exist": exists,
+            "absolute_images": list(views.values()) or absolute_images,
+            "review_images": list(views.values()) or absolute_images,
+            "geometry_view_images": views,
+            "images_exist": [Path(path).exists() for path in (list(views.values()) or absolute_images)],
             "episode_path": episode_path,
             "frame_index": frame_index_from_images(relative_images),
             "source_order": source_order,
@@ -710,6 +976,7 @@ def build_train_json_manifest(args: argparse.Namespace) -> dict[str, Any]:
         "manifest_source": "train-json",
         "data_root": args.data_root,
         "train_json": args.train_json,
+        "geometry_only": args.geometry_only,
         "all_train_rows": args.all_train_rows,
         "dedupe_rule": "one descriptor per task episode, preferring the lowest first-image frame index",
         "candidate_rows_before_dedup": len(candidates),
@@ -735,8 +1002,12 @@ def load_manifest(root: Path) -> dict[str, Any]:
 
 def run_geometry(args: argparse.Namespace, manifest: dict[str, Any]) -> None:
     import torch
-    from qwen_vl_utils import process_vision_info
     from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+    from run_qwen_dual_view_geometry_target_pose import (
+        apply_task_language_rules,
+        fuse_descriptors,
+        run_view,
+    )
 
     root = Path(args.root)
     demos = manifest.get("selected", [])
@@ -758,26 +1029,64 @@ def run_geometry(args: argparse.Namespace, manifest: dict[str, Any]) -> None:
         out_path = geometry_path(demo)
         update_progress(root, manifest, "geometry", demo["id"], {"stage_index": idx, "stage_total": len(pending)})
         try:
-            content = [{"type": "image", "image": img} for img in (demo.get("review_images") or demo.get("absolute_images") or [])[:2]]
-            content.append({"type": "text", "text": GEOMETRY_PROMPT.replace("{task}", demo.get("language_description", ""))})
-            messages = [{"role": "user", "content": content}]
-            text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            image_inputs, video_inputs = process_vision_info(messages)
-            inputs = processor(text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt").to(model.device)
-            with torch.no_grad():
-                generated = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False)
-            generated_trimmed = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated)]
-            decoded = processor.batch_decode(generated_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-            parsed, raw = clean_json(decoded)
+            views = geometry_view_images(demo)
+            if "front" not in views and views:
+                first_view, first_image = next(iter(views.items()))
+                views = {"front": first_image, **{key: value for key, value in views.items() if key != first_view}}
+            if "overhead" not in views and len(views) == 1:
+                views["overhead"] = views["front"]
+            if not views:
+                raise ValueError("no geometry view images found")
+
+            task_instruction = demo.get("language_description", "")
+            view_outputs = {
+                view_name: run_view(
+                    processor,
+                    model,
+                    image_path,
+                    task_instruction,
+                    view_name,
+                    args.max_new_tokens,
+                )
+                for view_name, image_path in views.items()
+                if view_name in {"front", "overhead"}
+            }
+            if "front" not in view_outputs:
+                raise ValueError("missing front view output")
+            if "overhead" not in view_outputs:
+                view_outputs["overhead"] = view_outputs["front"]
+
+            fused, source_by_field, conflicts = fuse_descriptors(
+                view_outputs["front"]["normalized_descriptor"],
+                view_outputs["overhead"]["normalized_descriptor"],
+            )
+            rule_adjustments = apply_task_language_rules(
+                demo.get("task"),
+                task_instruction,
+                fused,
+                source_by_field,
+            )
             write_json(
                 out_path,
                 {
                     "demo_id": demo["id"],
                     "task": demo.get("task"),
-                    "language_description": demo.get("language_description"),
+                    "language_description": task_instruction,
                     "model": args.qwen_model,
-                    "geometry_g_i": parsed,
-                    "raw_output": raw,
+                    "schema_version": "clean_geometry_target_pose_v2_no_start_no_tags",
+                    "image_inputs": {
+                        "front_image": views.get("front"),
+                        "overhead_image": views.get("overhead"),
+                    },
+                    "view_outputs": view_outputs,
+                    "geometry_g_i": fused["geometry"],
+                    "target_pose_i": fused["target_pose"],
+                    "fused_descriptor": fused,
+                    "source_by_field": source_by_field,
+                    "front_overhead_conflicts": conflicts,
+                    "rule_adjustments": rule_adjustments,
+                    "target_pose_in_retrieval": False,
+                    "target_pose_use": "final_llm_prompt_only",
                 },
             )
             if idx % args.empty_cache_every == 0 and torch.cuda.is_available():
@@ -811,8 +1120,14 @@ def make_robopoint_questions(root: Path, demos: list[dict[str, Any]], question_f
             row = {
                 "question_id": demo["id"],
                 "image": dst_name,
-                "text": QUESTION_TEMPLATE.format(task=demo.get("language_description", "")),
-                "category": "agnostos_affordance_full_cache",
+                "text": QUESTION_TEMPLATE.format(
+                    task=demo.get("language_description", ""),
+                    action_primitive=infer_action_primitive(demo.get("task", "")),
+                    contact_mode=infer_contact_mode(demo.get("task", "")),
+                    target_object=infer_manipulated_object(demo.get("task", "")),
+                    target_part=infer_target_part(demo.get("task", "")),
+                ),
+                "category": "agnostos_contact_hint_full_cache",
             }
             f.write(json.dumps(row) + "\n")
     return image_folder
@@ -854,10 +1169,10 @@ def write_affordance_outputs(args: argparse.Namespace, demos: list[dict[str, Any
                 "language_description": demo.get("language_description"),
                 "model": args.robopoint_model,
                 "images": demo.get("review_images") or demo.get("absolute_images"),
-                "affordance_a_i": {
+                "contact_hints_i": {
                     "raw_robopoint_text": ans.get("text"),
-                    "expected_schema": AFFORDANCE_SCHEMA,
-                    "note": "RoboPoint primarily predicts spatial affordance keypoints; symbolic affordance labels are normalized from task rules for retrieval.",
+                    "expected_schema": CONTACT_HINT_SCHEMA,
+                    "note": "RoboPoint predicts contact/keypoint hints only. These are not symbolic affordance descriptors and are not used for retrieval scoring.",
                     "vision_tower_note": "Pilot/full-cache run may use the RoboPoint LLM checkpoint with a local CLIP ViT-L/14 vision tower fallback on CAIR if openai/clip-vit-large-patch14-336 PyTorch weights cannot be fetched through Hugging Face SSL. Treat affordance outputs as human-check candidates.",
                 },
                 "raw_answer_record": ans,
@@ -938,26 +1253,26 @@ def normalize_outputs(args: argparse.Namespace, manifest: dict[str, Any]) -> Non
     for demo in manifest.get("selected", []):
         task = demo.get("task") or ""
         geometry_doc = read_json(geometry_path(demo), {})
-        geometry = geometry_doc.setdefault("geometry_g_i", {})
-        if geometry:
-            geometry["manipulated_object"] = infer_manipulated_object(task)
-            geometry["key_features"] = infer_geometry_key_features(task, geometry)
-            geometry["key_features_note"] = "Compact retrieval-oriented features normalized from the Qwen geometry output and task instruction."
+        geometry = geometry_doc.get("geometry_g_i") or {}
+        target_pose_i = geometry_doc.get("target_pose_i") or (geometry_doc.get("fused_descriptor") or {}).get("target_pose") or {}
+        if geometry and geometry_doc.get("schema_version") != "clean_geometry_target_pose_v2_no_start_no_tags":
+            geometry_doc.setdefault("raw_geometry_g_i", geometry)
+            geometry_doc["geometry_g_i"] = infer_primitive_geometry(task, geometry)
+            geometry = geometry_doc["geometry_g_i"]
             write_json(geometry_path(demo), geometry_doc)
 
-        affordance_doc = read_json(affordance_path(demo), {})
-        old_affordance = affordance_doc.get("affordance_a_i", {})
-        raw_text = old_affordance.get("raw_robopoint_text")
-        points = parse_points(raw_text)
-        vision_tower_note = old_affordance.get("vision_tower_note")
+        affordance_doc = {} if args.geometry_only else read_json(affordance_path(demo), {})
         if affordance_doc:
-            affordance_doc["affordance_a_i"] = infer_affordance(task, points, raw_text)
-            if vision_tower_note:
-                affordance_doc["affordance_a_i"]["vision_tower_note"] = vision_tower_note
+            old_contact = affordance_doc.get("contact_hints_i") or affordance_doc.get("affordance_a_i", {})
+            raw_text = old_contact.get("raw_robopoint_text")
+            points = parse_points(raw_text)
+            vision_tower_note = old_contact.get("vision_tower_note")
+            affordance_doc["contact_hints_i"] = infer_contact_hints(task, points, raw_text, vision_tower_note)
+            affordance_doc.pop("affordance_a_i", None)
             write_json(affordance_path(demo), affordance_doc)
 
         geometry_g_i = (geometry_doc or {}).get("geometry_g_i") or {}
-        affordance_a_i = (affordance_doc or {}).get("affordance_a_i") or {}
+        contact_hints_i = (affordance_doc or {}).get("contact_hints_i") or {}
         combined = {
             "demo_id": demo["id"],
             "scene_id": demo.get("scene_id"),
@@ -968,14 +1283,23 @@ def normalize_outputs(args: argparse.Namespace, manifest: dict[str, Any]) -> Non
             "demo_dir": demo.get("demo_dir"),
             "images": demo.get("review_images") or demo.get("absolute_images") or [],
             "geometry_model": (geometry_doc or {}).get("model"),
+            "geometry_schema_version": (geometry_doc or {}).get("schema_version"),
+            "raw_geometry_g_i": (geometry_doc or {}).get("raw_geometry_g_i"),
             "geometry_g_i": geometry_g_i,
-            "affordance_model": (affordance_doc or {}).get("model"),
-            "affordance_a_i": affordance_a_i,
+            "target_pose_i": target_pose_i,
+            "target_pose_in_retrieval": False,
+            "target_pose_use": "final_llm_prompt_only",
+            "source_by_field": (geometry_doc or {}).get("source_by_field"),
+            "front_overhead_conflicts": (geometry_doc or {}).get("front_overhead_conflicts"),
+            "rule_adjustments": (geometry_doc or {}).get("rule_adjustments"),
             "source_files": {
                 "geometry_qwen2_5_vl": str(geometry_path(demo)),
-                "affordance_robopoint": str(affordance_path(demo)),
             },
         }
+        if not args.geometry_only and affordance_doc:
+            combined["robopoint_model"] = affordance_doc.get("model")
+            combined["contact_hints_i"] = contact_hints_i
+            combined["source_files"]["contact_hints_robopoint"] = str(affordance_path(demo))
         combined_path = combined_review_path(root, demo)
         write_json(combined_path, combined)
         combined_rows.append(combined)
@@ -988,16 +1312,22 @@ def normalize_outputs(args: argparse.Namespace, manifest: dict[str, Any]) -> Non
                 "language_description": demo.get("language_description"),
                 "episode_path": demo.get("episode_path"),
                 "geometry_done": geometry_path(demo).exists(),
-                "affordance_done": affordance_path(demo).exists(),
-                "geometry_key_features": geometry_g_i.get("key_features", []),
-                "preferred_contact_points": affordance_a_i.get("preferred_contact_points", []),
-                "grasp_affordance": affordance_a_i.get("grasp_affordance"),
-                "contact_affordance": affordance_a_i.get("contact_affordance"),
-                "motion_affordance": affordance_a_i.get("motion_affordance"),
-                "required_contact_region": affordance_a_i.get("required_contact_region"),
+                "action_primitive": geometry_g_i.get("action_primitive"),
+                "motion_type": geometry_g_i.get("motion_type"),
+                "motion_axis": geometry_g_i.get("motion_axis"),
+                "contact_type": geometry_g_i.get("contact_type"),
+                "contact_region": geometry_g_i.get("contact_region"),
+                "constraint_type": geometry_g_i.get("constraint_type"),
+                "alignment_requirement": geometry_g_i.get("alignment_requirement"),
+                "target_pose_goal_state": target_pose_i.get("goal_state_type"),
+                "target_pose_relation": target_pose_i.get("required_final_relation"),
                 "combined_review_file": str(combined_path),
             }
         )
+        if not args.geometry_only:
+            rows[-1]["contact_hints_done"] = affordance_path(demo).exists()
+            rows[-1]["contact_mode"] = contact_hints_i.get("contact_mode")
+            rows[-1]["points_2d_normalized"] = contact_hints_i.get("points_2d_normalized", [])
 
     write_json(root / "review_index.json", rows)
     with (root / "review_bundle.jsonl").open("w") as f:
@@ -1011,17 +1341,29 @@ def normalize_outputs(args: argparse.Namespace, manifest: dict[str, Any]) -> Non
 def write_summary_markdown(root: Path, manifest: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     counts = progress_counts(root, manifest)
     with (root / "cache_summary.md").open("w") as f:
-        f.write("# Full Seen Geometry/Affordance Cache\n\n")
+        geometry_only = bool(rows) and "contact_hints_done" not in rows[0]
+        title = "Full Seen Clean Geometry + Target-Pose Cache" if geometry_only else "Full Seen Clean Geometry + Target-Pose / Contact-Hint Cache"
+        f.write(f"# {title}\n\n")
         f.write(f"- Root: `{root}`\n")
         f.write(f"- Total demos: `{counts['total_demos']}`\n")
         f.write(f"- Geometry complete: `{counts['geometry_done']}`\n")
-        f.write(f"- Affordance complete: `{counts['affordance_done']}`\n")
+        f.write("- Geometry schema: `clean_geometry_target_pose_v2_no_start_no_tags`\n")
+        f.write("- Target pose use: final LLM prompt only, not retrieval scoring\n")
+        if not geometry_only:
+            f.write(f"- Contact hints complete: `{counts['affordance_done']}`\n")
         f.write(f"- Review bundle: `{root / 'review_bundle.jsonl'}`\n\n")
         f.write("## Task Counts\n\n")
-        f.write("| Task | Total | Geometry | Affordance |\n")
-        f.write("| --- | ---: | ---: | ---: |\n")
+        if geometry_only:
+            f.write("| Task | Total | Geometry |\n")
+            f.write("| --- | ---: | ---: |\n")
+        else:
+            f.write("| Task | Total | Geometry | Contact hints |\n")
+            f.write("| --- | ---: | ---: | ---: |\n")
         for task, item in sorted(counts["by_task"].items()):
-            f.write(f"| {task} | {item['total']} | {item['geometry']} | {item['affordance']} |\n")
+            if geometry_only:
+                f.write(f"| {task} | {item['total']} | {item['geometry']} |\n")
+            else:
+                f.write(f"| {task} | {item['total']} | {item['geometry']} | {item['affordance']} |\n")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1039,6 +1381,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--all-train-rows", action="store_true", help="Cache every train.json row instead of one descriptor per episode")
     parser.add_argument("--force-geometry", action="store_true")
     parser.add_argument("--force-affordance", action="store_true")
+    parser.add_argument("--geometry-only", action="store_true", help="Normalize/write review bundle without RoboPoint/contact-hint fields")
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--empty-cache-every", type=int, default=25)
     parser.add_argument("--progress-every", type=int, default=10, help="Print every N completed geometry demos")

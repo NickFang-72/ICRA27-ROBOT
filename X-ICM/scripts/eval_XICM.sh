@@ -67,9 +67,13 @@ if [ "$disable_nccl" != "true" ]; then
     export NCCL_IB_DISABLE=1
 fi
 
-echo "evaluate on 23 unseen tasks: ${unseen_tasks[@]}, using ${ranking_method} ranking method"
+if [[ -n "${XICM_TASKS_OVERRIDE:-}" ]]; then
+    IFS=',' read -r -a tasks <<< "$XICM_TASKS_OVERRIDE"
+else
+    tasks=("${unseen_tasks[@]}")
+fi
 
-tasks=("${unseen_tasks[@]}")
+echo "evaluate on ${#tasks[@]} unseen tasks: ${tasks[@]}, using ${ranking_method} ranking method"
 tasks_string=$(printf "%s," "${tasks[@]}")
 tasks_string=${tasks_string%,}
 

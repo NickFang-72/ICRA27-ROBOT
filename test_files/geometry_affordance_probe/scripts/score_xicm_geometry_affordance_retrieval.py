@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Rank seen demonstrations with dynamic, geometry, and affordance scores.
+"""Rank seen demonstrations with dynamic and primitive-geometry scores.
 
 This script is intentionally outside the vanilla X-ICM baseline path. The
 original ``lang_vis.out`` retrieval remains reproducible; this file prepares
-rankings for the geometry/affordance ablation only.
+rankings for the clean geometry/contact-hint ablation only.
+
+Contact points and target-pose descriptors are deliberately prompt-only. They
+can be passed through for inspection or final LLM prompting, but they must not
+change the retrieval score.
 """
 
 from __future__ import annotations
@@ -42,32 +46,25 @@ SEEN_TASKS = {
 }
 
 GEOMETRY_FIELDS = [
-    "manipulated_object",
-    "key_features",
-    "primary_shape",
-    "part_geometry",
-    "size",
-    "aspect_ratio",
-    "orientation",
-    "opening_geometry",
-    "axis_geometry",
-    "symmetry",
-    "clearance_geometry",
-    "task_relevant_geometric_cues",
+    "action_primitive",
+    "motion_type",
+    "motion_axis",
+    "contact_type",
+    "contact_region",
+    "constraint_type",
+    "alignment_requirement",
 ]
 
-AFFORDANCE_FIELDS = [
-    "grasp_affordance",
-    "contact_affordance",
-    "motion_affordance",
-    "support_affordance",
-    "containment_affordance",
-    "articulation_affordance",
-    "required_contact_region",
-    "precision_requirement",
-    "force_requirement",
-    "failure_sensitive_property",
-]
+GEOMETRY_FIELD_WEIGHTS = {
+    "action_primitive": 0.45,
+    "motion_type": 0.15,
+    "motion_axis": 0.15,
+    "contact_type": 0.08,
+    "contact_region": 0.07,
+    "constraint_type": 0.07,
+    "alignment_requirement": 0.03,
+}
+ACTION_MISMATCH_SCORE_CAP = 0.25
 
 
 def load_json(path: str | Path) -> Any:
@@ -283,6 +280,294 @@ def descriptor_tokens(descriptor: dict[str, Any], fields: Iterable[str]) -> set[
     return {token for token in tokens if token not in {"none", "unknown", "null"}}
 
 
+def first_label(value: Any, default: str = "unknown") -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower().replace(" ", "_")
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            label = first_label(item, "")
+            if label:
+                return label
+    return default
+
+
+def as_labels(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip().lower().replace(" ", "_")] if value.strip() else []
+    if isinstance(value, (list, tuple, set)):
+        labels: list[str] = []
+        for item in value:
+            labels.extend(as_labels(item))
+        return labels
+    return []
+
+
+def action_from_legacy_affordance(affordance: dict[str, Any]) -> str:
+    action = first_label(
+        affordance.get("motion_affordance")
+        or affordance.get("action_primitive")
+        or affordance.get("contact_affordance"),
+        "unknown",
+    )
+    mapping = {
+        "rotate": "twist",
+        "rotate_part": "twist",
+        "lift_and_place": "place",
+        "lift_then_place": "place",
+        "lift_then_insert": "insert",
+        "insert_then_twist": "insert",
+        "push_surface": "push",
+        "pull_handle": "pull",
+    }
+    return mapping.get(action, action)
+
+
+def action_from_task(task: str | None, action: str) -> str:
+    task_text = first_label(task, "")
+    if "push_buttons" in task_text:
+        return "press"
+    if "sweep_to_dustpan" in task_text:
+        return "sweep"
+    return action
+
+
+def normalize_target_part(value: Any) -> str:
+    part = first_label(value, "unknown")
+    if part in {"handle", "lid", "rim", "knob", "button_top", "slot", "hole", "opening", "body", "edge", "spout", "socket", "surface", "unknown"}:
+        return part
+    if "button" in part:
+        return "button_top"
+    if "handle" in part:
+        return "handle"
+    if "knob" in part:
+        return "knob"
+    if "rim" in part:
+        return "rim"
+    if "edge" in part:
+        return "edge"
+    if "slot" in part:
+        return "slot"
+    if "hole" in part or "socket" in part:
+        return "hole"
+    if "opening" in part:
+        return "opening"
+    if "side" in part or "surface" in part:
+        return "surface"
+    if "body" in part or "base" in part:
+        return "body"
+    return "unknown"
+
+
+def normalize_primary_shape(value: Any, text: str) -> str:
+    shape = first_label(value, "")
+    text = " ".join([shape, text.lower()])
+    if "push_buttons" in text:
+        return "button"
+    if "insert_onto_square_peg" in text:
+        return "peg"
+    if "close_jar" in text or "light_bulb_in" in text:
+        return "round_object"
+    if any(token in text for token in ["open_drawer", "put_item_in_drawer", "put_money_in_safe", "put_groceries_in_cupboard", "place_shape_in_shape_sorter", "slide_block_to_color_target"]):
+        return "box_like"
+    if "sweep_to_dustpan" in text:
+        return "thin_flat_object"
+    if "turn_tap" in text:
+        return "elongated_tool"
+    if "button" in text:
+        return "button"
+    if "peg" in text:
+        return "peg"
+    if any(token in text for token in ["drawer", "safe", "cupboard", "block", "box", "rectangular", "cube"]):
+        return "box_like"
+    if any(token in text for token in ["money", "thin", "flat", "plate"]):
+        return "thin_flat_object"
+    if any(token in text for token in ["tap", "handle", "spatula", "tool", "sweeping"]):
+        return "elongated_tool"
+    if any(token in text for token in ["jar", "bulb", "round", "circular", "cylinder", "cylindrical", "rim"]):
+        return "round_object"
+    if any(token in text for token in ["shape_sorter", "shape_profile", "irregular"]):
+        return "irregular"
+    if shape in {"round_object", "box_like", "thin_flat_object", "elongated_tool", "button", "peg", "irregular", "unknown"}:
+        return shape
+    return "unknown"
+
+
+def normalize_constraint_type(value: Any, action: str, tags: Any) -> str:
+    constraint = first_label(value, "unknown")
+    tag_set = set(as_labels(tags))
+    if action in {"twist", "rotate"} or tag_set.intersection({"hinge", "sliding_axis", "rotational_axis"}):
+        return "joint"
+    if "slot" in constraint:
+        return "slot"
+    if "hole" in constraint or "socket" in constraint:
+        return "hole"
+    if "opening" in constraint or constraint in {"receptacle", "open_container", "closed_container"}:
+        return "container"
+    if constraint in {"support_cradle", "support"}:
+        return "support_surface"
+    if constraint in {"slot", "hole", "container", "joint", "support_surface", "surface_target", "free_space", "none", "unknown"}:
+        return constraint
+    return "none" if constraint in {"", "unknown"} else constraint
+
+
+def normalize_state(value: Any) -> str:
+    state = first_label(value, "unknown")
+    if state in {"open", "closed", "attached", "detached", "inside", "on_surface", "free", "unknown"}:
+        return state
+    if "open" in state:
+        return "open"
+    if "closed" in state:
+        return "closed"
+    if "attached" in state or "grasp" in state or "held" in state:
+        return "attached"
+    if "inside" in state:
+        return "inside"
+    if "surface" in state:
+        return "on_surface"
+    if "free" in state:
+        return "free"
+    return "unknown"
+
+
+def motion_type_from_axis(axis: Any, action: str) -> str:
+    axis = first_label(axis, "unknown")
+    if action in {"twist", "rotate"} or "rotat" in axis or "tilt" in axis:
+        return "rotational"
+    if action == "insert":
+        return "insertion"
+    if action in {"place", "stack", "lift"}:
+        return "vertical"
+    if action in {"slide", "sweep", "drag"}:
+        return "planar"
+    if action in {"push", "pull", "press"}:
+        return "linear"
+    if axis in {"horizontal", "vertical", "linear", "front_normal"}:
+        return "linear"
+    return "unknown"
+
+
+def motion_axis_from_axis(axis: Any, action: str) -> str:
+    axis = first_label(axis, "unknown")
+    if action in {"twist", "rotate"} or "rotat" in axis or "tilt" in axis:
+        return "rotational"
+    if action == "insert" or axis in {"slot", "hole", "front_opening", "top_opening", "support_cradle"}:
+        return "into_opening"
+    if action in {"slide", "sweep", "drag"} or axis == "free_motion":
+        return "across_surface"
+    if action in {"place", "stack", "lift"} or axis == "vertical":
+        return "vertical"
+    if action in {"push", "pull"} or axis in {"horizontal", "linear"}:
+        return "horizontal"
+    if action == "press":
+        return "surface_normal"
+    return "unknown"
+
+
+def constraint_from_opening(opening: Any, affordance: dict[str, Any]) -> str:
+    opening = first_label(opening, "unknown")
+    containment = first_label(affordance.get("containment_affordance"), "")
+    articulation = first_label(affordance.get("articulation_affordance"), "")
+    if any(token in opening for token in ["slot", "hole", "opening"]):
+        return opening
+    if containment in {"slot", "hole", "receptacle", "open_container", "closed_container"}:
+        return containment
+    if "hinge" in articulation or "drawer" in articulation:
+        return "joint"
+    if opening == "support_cradle":
+        return "support_surface"
+    if opening in {"none", "unknown"}:
+        return "none"
+    return opening
+
+
+def contact_type_from_action(action: str) -> str:
+    if action in {"pull", "lift", "place", "insert", "stack", "twist"}:
+        return "grasp"
+    if action == "press":
+        return "press"
+    if action in {"push", "slide", "sweep", "drag"}:
+        return "surface_contact"
+    return "unknown"
+
+
+def alignment_from_geometry(geometry: dict[str, Any], affordance: dict[str, Any]) -> str:
+    text = json.dumps({"geometry": geometry, "affordance": affordance}, sort_keys=True).lower()
+    if any(token in text for token in ["alignment_sensitive", "misalignment", "slot", "hole", "peg", "socket", "shape_profile"]):
+        return "high"
+    if any(token in text for token in ["target", "rack", "shelf", "hoop", "rim"]):
+        return "medium"
+    return "low"
+
+
+def object_category_from_text(text: str) -> str:
+    text = text.lower()
+    if any(token in text for token in ["drawer", "door", "lid", "hinge", "knob", "tap", "switch", "button"]):
+        return "articulated_or_control"
+    if any(token in text for token in ["slot", "hole", "socket", "peg", "stand", "shape_sorter"]):
+        return "alignment_target"
+    if any(token in text for token in ["cupboard", "bin", "shelf", "rack", "hoop", "container", "safe"]):
+        return "receptacle_or_support"
+    if any(token in text for token in ["rope", "spatula", "knife", "umbrella", "charger", "usb"]):
+        return "elongated_or_tool"
+    return "rigid_object"
+
+
+def canonical_geometry(task: str | None, geometry: dict[str, Any], affordance: dict[str, Any] | None = None) -> dict[str, Any]:
+    affordance = affordance or {}
+    geometry = geometry or {}
+    action = first_label(geometry.get("action_primitive"), "")
+    if not action:
+        action = action_from_legacy_affordance(affordance)
+    action = action_from_task(task, action)
+    old_tags = as_labels(geometry.get("geometry_tags")) or as_labels(geometry.get("task_relevant_geometric_cues")) or as_labels(geometry.get("key_features"))
+    old_tags = [
+        tag for tag in old_tags
+        if tag not in {"left", "right", "left_orientation", "right_orientation", "downward_direction", "upward_direction", "color", "red", "green", "blue", "maroon", "robot_arm", "elbow", "wrist", "static", "standing"}
+    ]
+    target_part = normalize_target_part(
+        geometry.get("target_part")
+        or affordance.get("required_contact_region")
+        or geometry.get("part_geometry")
+    )
+    manipulated_object = first_label(geometry.get("manipulated_object"), task or "unknown")
+    text = " ".join([task or "", manipulated_object, target_part, " ".join(old_tags)])
+    constraint_type = normalize_constraint_type(
+        first_label(geometry.get("constraint_type"), constraint_from_opening(geometry.get("opening_geometry"), affordance)),
+        action,
+        old_tags,
+    )
+    out = {
+        "manipulated_object": manipulated_object,
+        "object_category": first_label(geometry.get("object_category"), object_category_from_text(text)),
+        "primary_shape": normalize_primary_shape(geometry.get("primary_shape"), text),
+        "target_part": target_part,
+        "secondary_parts": as_labels(geometry.get("secondary_parts")) or as_labels(geometry.get("part_geometry"))[:3],
+        "action_primitive": action,
+        "motion_type": first_label(geometry.get("motion_type"), motion_type_from_axis(geometry.get("axis_geometry"), action)),
+        "motion_axis": first_label(geometry.get("motion_axis"), motion_axis_from_axis(geometry.get("axis_geometry") or geometry.get("opening_geometry"), action)),
+        "contact_type": first_label(geometry.get("contact_type"), contact_type_from_action(action)),
+        "contact_region": first_label(geometry.get("contact_region") or affordance.get("required_contact_region"), target_part),
+        "constraint_type": constraint_type,
+        "alignment_requirement": first_label(geometry.get("alignment_requirement"), alignment_from_geometry(geometry, affordance)),
+        "state": normalize_state(geometry.get("state") or geometry.get("pose_relation")),
+        "geometry_tags": sorted(set(old_tags + as_labels(geometry.get("geometry_tags")))),
+    }
+    if geometry.get("execution_clearance_hint") or geometry.get("clearance_geometry"):
+        out["execution_clearance_hint"] = first_label(
+            geometry.get("execution_clearance_hint") or geometry.get("clearance_geometry"),
+            "unknown",
+        )
+    return out
+
+
+def field_similarity(seen: dict[str, Any], query: dict[str, Any], field: str) -> float:
+    if field == "geometry_tags":
+        return jaccard(set(as_labels(seen.get(field))), set(as_labels(query.get(field))))
+    return jaccard(set(flatten_descriptor_values(seen.get(field))), set(flatten_descriptor_values(query.get(field))))
+
+
 def jaccard(a: set[str], b: set[str]) -> float:
     if not a and not b:
         return 0.0
@@ -318,16 +603,23 @@ def point_similarity(a: list[tuple[float, float]], b: list[tuple[float, float]])
 
 
 def geometry_similarity(seen: dict[str, Any], query: dict[str, Any]) -> float:
-    return jaccard(descriptor_tokens(seen, GEOMETRY_FIELDS), descriptor_tokens(query, GEOMETRY_FIELDS))
+    seen = canonical_geometry(None, seen)
+    query = canonical_geometry(None, query)
+    score = 0.0
+    total = 0.0
+    for field, weight in GEOMETRY_FIELD_WEIGHTS.items():
+        score += weight * field_similarity(seen, query, field)
+        total += weight
+    normalized = score / total if total else 0.0
+    seen_action = first_label(seen.get("action_primitive"), "")
+    query_action = first_label(query.get("action_primitive"), "")
+    if seen_action and query_action and seen_action != query_action and "unknown" not in {seen_action, query_action}:
+        return min(normalized, ACTION_MISMATCH_SCORE_CAP)
+    return normalized
 
 
 def affordance_similarity(seen: dict[str, Any], query: dict[str, Any]) -> float:
-    label_score = jaccard(descriptor_tokens(seen, AFFORDANCE_FIELDS), descriptor_tokens(query, AFFORDANCE_FIELDS))
-    seen_points = points(seen.get("preferred_contact_points"))
-    query_points = points(query.get("preferred_contact_points"))
-    if seen_points and query_points:
-        return 0.8 * label_score + 0.2 * point_similarity(seen_points, query_points)
-    return label_score
+    return 0.0
 
 
 def minmax(values: list[float]) -> list[float]:
@@ -386,8 +678,12 @@ def rank_candidates(
         descriptor = descriptor_for_candidate(row, descriptor_cache)
         if descriptor is None:
             continue
-        geometry = descriptor.get("geometry_g_i") or descriptor.get("geometry") or {}
-        affordance = descriptor.get("affordance_a_i") or descriptor.get("affordance") or {}
+        contact_hints = descriptor.get("contact_hints_i") or descriptor.get("affordance_a_i") or descriptor.get("affordance") or {}
+        geometry = canonical_geometry(
+            infer_task(row),
+            descriptor.get("geometry_g_i") or descriptor.get("geometry") or {},
+            contact_hints,
+        )
         s_dyn_raw = row.get("s_dyn_raw")
         if s_dyn_raw in (None, ""):
             s_dyn_raw = dynamic_score_from_row(row)
@@ -400,16 +696,16 @@ def rank_candidates(
             "language_description": descriptor.get("language_description") or row.get("language_description"),
             "s_dyn_raw": float(s_dyn_raw),
             "s_geo": geometry_similarity(geometry, query_geometry),
-            "s_aff": affordance_similarity(affordance, query_affordance),
+            "s_aff": 0.0,
             "geometry_g_i": geometry,
-            "affordance_a_i": affordance,
+            "contact_hints_i": contact_hints,
         }
         scored.append(enriched)
 
     s_dyn_values = minmax([row["s_dyn_raw"] for row in scored])
     for row, s_dyn in zip(scored, s_dyn_values):
         row["s_dyn"] = s_dyn
-        row["score"] = alpha * row["s_dyn"] + beta * row["s_geo"] + gamma * row["s_aff"]
+        row["score"] = alpha * row["s_dyn"] + beta * row["s_geo"]
 
     ranked = sorted(scored, key=lambda row: row["score"], reverse=True)
     for rank, row in enumerate(ranked, start=1):
@@ -426,10 +722,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--query-task-instruction", help="Query language instruction for direct X-ICM S_dyn extraction")
     parser.add_argument("--dynamics-features-pkl", help="Optional all_diffusion_features.pkl override")
     parser.add_argument("--query-geometry", required=True, help="JSON file containing g_j or geometry_g_j")
-    parser.add_argument("--query-affordance", required=True, help="JSON file containing a_j or affordance_a_j")
+    parser.add_argument("--query-affordance", help="Legacy/optional JSON file containing contact hints; ignored for retrieval scoring")
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument("--beta", type=float, default=0.0)
-    parser.add_argument("--gamma", type=float, default=0.0)
+    parser.add_argument("--gamma", type=float, default=0.0, help="Ignored in clean v1; kept for CLI compatibility")
     parser.add_argument("--top-k", type=int, default=18)
     parser.add_argument("--seen-only-action", choices=["error", "filter"], default="error")
     parser.add_argument("--out", required=True)
@@ -454,9 +750,10 @@ def main() -> None:
         )
 
     query_geometry_doc = load_json(args.query_geometry)
-    query_affordance_doc = load_json(args.query_affordance)
+    query_affordance_doc = load_json(args.query_affordance) if args.query_affordance else {}
     query_geometry = query_geometry_doc.get("geometry_g_j") or query_geometry_doc.get("geometry_g_i") or query_geometry_doc
     query_affordance = query_affordance_doc.get("affordance_a_j") or query_affordance_doc.get("affordance_a_i") or query_affordance_doc
+    query_geometry = canonical_geometry(None, query_geometry, query_affordance)
 
     ranked = rank_candidates(
         dynamic_rows,
@@ -470,13 +767,13 @@ def main() -> None:
         args.seen_only_action,
     )
     payload = {
-        "formula": "score(D_i,Q_j)=alpha*S_dyn(D_i,Q_j)+beta*S_geo(g_i,g_j)+gamma*S_aff(a_i,a_j)",
-        "weights": {"alpha": args.alpha, "beta": args.beta, "gamma": args.gamma},
+        "formula": "score(D_i,Q_j)=alpha*S_dyn(D_i,Q_j)+beta*S_geo(g_i,g_j)",
+        "weights": {"alpha": args.alpha, "beta": args.beta, "gamma_ignored": args.gamma},
         "top_k": args.top_k,
         "component_notes": {
             "S_dyn": "Original X-ICM dynamic similarity, min-max normalized per query across seen candidates.",
-            "S_geo": "Jaccard similarity over normalized geometry descriptor tokens.",
-            "S_aff": "Jaccard similarity over normalized affordance descriptor tokens, with optional contact-point proximity.",
+            "S_geo": "Weighted similarity over normalized primitive geometry/action fields.",
+            "S_aff": "Removed in clean v1. RoboPoint/contact hints are final-prompt evidence only, not retrieval scoring.",
         },
         "ranked": ranked,
     }

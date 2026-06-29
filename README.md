@@ -9,6 +9,21 @@ The current direction is simple and modular: follow the X-ICM pipeline, but add 
 
 The goal is to test whether X-ICM retrieves better seen demonstrations when the original dynamics similarity is augmented with geometry and affordance similarity.
 
+## GitHub Push Policy
+
+The GitHub repo should contain code, launch scripts, lightweight fixtures, and documentation only. Generated experiment artifacts stay local and are ignored by `.gitignore`.
+
+Local-only folders include:
+
+- `outputs/`
+- `test_files/geometry_affordance_probe/ablation_results/`
+- `test_files/geometry_affordance_probe/batch_*/`
+- `test_files/geometry_affordance_probe/review/`
+- `test_files/geometry_affordance_probe/figures/`
+- `test_files/xicm_baseline_results/`
+
+Those folders may contain CAIR logs, rendered observations, ablation CSVs, review packets, figures, and PowerPoint exports. They are useful working artifacts, but they should not be committed or pushed. Regenerate or pull them from CAIR when needed.
+
 ## Trial Versions
 
 This project now has four geometry/affordance trial lines. They should be kept conceptually separate even when the implementation shares `X-ICM/form_icl_demonstrations_crosstask_ranking.py`.
@@ -18,9 +33,25 @@ This project now has four geometry/affordance trial lines. They should be kept c
 | v1 | `lang_vis.out.geo_aff` | Add Qwen geometry `g_i/g_j` and RoboPoint affordance `a_i/a_j` to retrieval and prompt context. | Completed ablation, average `20.87`; underperformed the original rerun. |
 | v2 | `lang_vis.out.geo_aff_v2` | Keep dynamics similarity as the anchor, add a precise interaction signature, transfer penalties, and prompt-visible attention bias. | Compact K sweep complete for `k=6,8,10`; best average tied at `21.74` for `k=6` and `k=8`. |
 | v3 | `lang_vis.out.geo_aff_v3` | Use contact-mode/mechanical compatibility, stronger conflict penalties, retrieval diversity caps, and explicit contact-mode prompt guidance. | Completed `k=6`, average `20.00`; failed to improve because the prompt still asked the model to turn many descriptor-heavy demos directly into one 7D action chain. |
-| v4 | `lang_vis.out.geo_aff_v4` | Test a semantic bottleneck: Stage 1 converts descriptor-heavy context into a simple manipulation intent, then Stage 2 uses that intent plus seen observation/action trajectories to predict 7D actions. | Prepared for `k=6` CAIR benchmark. |
+| v4 | `lang_vis.out.geo_aff_v4` | Test a semantic bottleneck: Stage 1 converts descriptor-heavy context into a grounded manipulation intent, then Stage 2 emits a relative action sketch plus final 7D actions in one call. | Improved `k=6` CAIR rerun launched from a clean v4 log folder. |
 
-The important difference between v2, v3, and v4 is where the extra structure enters. V2 uses descriptors as conservative retrieval tie-breakers. V3 tries to retrieve physically compatible demonstrations more aggressively, but still gives the LLM one large descriptor-and-trajectory prompt. V4 keeps the retrieval idea but splits prompting into two calls so the model first states the manipulation intent in simple words, then predicts the 7D action sequence from that intent and the retrieved action examples.
+The important difference between v2, v3, and v4 is where the extra structure enters. V2 uses descriptors as conservative retrieval tie-breakers. V3 tries to retrieve physically compatible demonstrations more aggressively, but still gives the LLM one large descriptor-and-trajectory prompt. V4 keeps the retrieval idea but splits prompting into two calls: Stage 1 states the manipulation intent in grounded words, and Stage 2 first writes a simple relative action sketch before emitting the final `key_actions_7d` list used by the evaluator.
+
+Baseline and ablation comparisons should use three seeds from now on: `0,50,99`, with `25` evaluation episodes per task per seed. The original paper X-ICM 7B artifact uses these same three seeds, so this is the fair comparison protocol.
+
+Current vanilla 3-seed baseline watcher:
+
+```bash
+INTERVAL_SECONDS=120 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_baseline_rerun_from_local.sh
+```
+
+Current improved v4 watcher:
+
+```bash
+INTERVAL_SECONDS=120 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_v4_progress_from_local.sh
+```
+
+Saved next idea, if v4 still struggles: retrieve a slightly larger pool such as `k=8` or `k=10`, then have Stage 1 assign demo roles like `primary_motion_template`, `gripper_timing_reference`, `axis_or_contact_reference`, or `ignore` before Stage 2 sees the action trajectories. Avoid returning to noisy `k=18`.
 
 Directory organization is intentionally postponed as of 2026-06-21. Several v1/v2-related files are already edited in the working tree, and a local v2 watcher was active during this documentation pass. To avoid disturbing running or dirty trial state, do not move, rename, or reorganize trial scripts/logs until the worktree is clean and no watcher/evaluator is active.
 
@@ -197,7 +228,7 @@ After RoboPoint runs, `normalize_geometry_affordance_outputs.py` parses the cont
 
 ## Current Experiment State
 
-The current pilot has two seen-task review batches:
+The current pilot uses two local seen-task review batches. They are generated artifacts and are intentionally not tracked in Git:
 
 - `test_files/geometry_affordance_probe/batch_01`
 - `test_files/geometry_affordance_probe/batch_02`
@@ -211,7 +242,7 @@ Each batch contains:
 - A batch-level `review_index.md`.
 - A batch-level `review_bundle.jsonl`.
 
-Open these first:
+If the local batch folders are present, open these first:
 
 - `test_files/geometry_affordance_probe/batch_01/review_index.md`
 - `test_files/geometry_affordance_probe/batch_02/review_index.md`
@@ -239,11 +270,15 @@ The compact v2 K sweep is complete on CAIR under:
 /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations
 ```
 
-The current v3 status is an active CAIR run. The read-only check on 2026-06-21 found `progress_v3.json` with status `running`, `0/23` completed task CSVs, and log path:
+The v3 `k=6` run is complete with average `20.00`. The active run is the
+improved v4 `k=6` clean rerun under:
 
 ```text
-/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/logs/geometry_affordance_v3_k6_20260621_232651.log
+/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/progress_v4.json
 ```
+
+The old stopped v4 partial outputs were archived before relaunch so the active
+v4 table starts from `0/23` strict final scores.
 
 ## CAIR Setup
 
@@ -321,7 +356,7 @@ It is slow on the current network path, so the preferred next step is either to 
 
 ## How This Extends X-ICM
 
-The intended X-ICM prompt should keep dynamics, geometry, and affordance separate:
+The v1-v3 prompt path keeps dynamics, geometry, and affordance separate:
 
 ```text
 Seen demonstration:
@@ -364,6 +399,20 @@ Affordance features a_j:
 Predict the intended next state or key 7D actions.
 ```
 
+The improved v4 prompt path adds a semantic bottleneck:
+
+```text
+Stage 1:
+descriptors + scene summaries + unseen current observation
+-> grounded semantic manipulation plan
+
+Stage 2:
+semantic plan + seen observation/action trajectories + unseen current observation
+-> relative_action_sketch + key_actions_7d
+```
+
+The evaluator still consumes only `key_actions_7d`.
+
 The research question is whether adding `g_i/a_i` and `g_j/a_j` improves retrieval and in-context prediction on cross-task manipulation, especially for tasks whose language differs but whose physical structure is similar.
 
 The prepared combined prompt template lives at:
@@ -374,12 +423,12 @@ test_files/geometry_affordance_probe/prompts/xicm_geometry_affordance_prompt.md
 
 ## Next Steps
 
-1. Preserve the completed v1/v2 artifacts before reorganizing anything.
-2. Launch v3 only after confirming no evaluator/watch process is using the same files.
-3. Pull v3 results and regenerate the paper-style tables once all 23 strict final scores exist.
-4. Compare v3 against the v2 `k=6` and `k=8` tie, not only against the original v1 descriptor ablation.
-5. Inspect whether v3 improves the four all-zero v2 tasks: `put_toilet_roll_on_stand`, `put_books_on_bookshelf`, `basketball_in_hoop`, and `scoop_with_spatula`.
-6. Only after the working tree is clean, reorganize trial artifacts into stable v1/v2/v3 folders or add symlink-style indexes that do not break existing scripts.
+1. Monitor the improved v4 `k=6` rerun until all 23 strict final scores exist.
+2. Pull v4 logs and regenerate the paper-style wide table whenever new strict finals appear.
+3. Compare v4 against the X-ICM 7B rerun, paper X-ICM 7B/72B rows, v2 `k=6/8/10`, and v3 `k=6`.
+4. Inspect whether v4 improves the previously hard tasks: `put_toilet_roll_on_stand`, `put_books_on_bookshelf`, `basketball_in_hoop`, and `scoop_with_spatula`.
+5. If v4 still struggles, implement the saved Stage 1 demo-role selection idea with `k=8` or `k=10`, not noisy `k=18`.
+6. Only after the working tree is clean and no evaluator/watch process is active, reorganize trial artifacts into stable versioned folders or add symlink-style indexes that do not break existing scripts.
 
 ## Living Notes
 

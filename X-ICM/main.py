@@ -132,12 +132,25 @@ def eval_seed(eval_cfg,
 
 def load_weight(savedir):
     components={}
+    is_vl_model = False
 
     ################ vllm local deploy ########################
-    if "Qwen2.5.7B.instruct" in savedir:
+    if "Qwen2.5.VL.7B.instruct" in savedir:
+        is_vl_model = True
+        model_name = os.environ.get(
+            "XICM_QWEN25_VL_7B_PATH",
+            "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+        )
+        if not os.path.exists(model_name):
+            model_name = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+    elif "Qwen2.5.7B.instruct" in savedir:
         ### load Qwen2.5-7B-Instruct from local file
         ### TODO: download from huggingface, change the path
-        model_name = "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28"
+        model_name = os.environ.get(
+            "XICM_QWEN_7B_PATH",
+            "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28",
+        )
         
         ### load model from huggingface if not loaded from local file
         if not os.path.exists(model_name):
@@ -146,7 +159,10 @@ def load_weight(savedir):
     elif "Qwen2.5.72B.instruct" in savedir:
         ### load Qwen2.5-72B-Instruct from local file
         ### TODO: download from huggingface, change the path
-        model_name = "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-72B-Instruct/snapshots/495f39366efef23836d0cfae4fbe635880d2be31"
+        model_name = os.environ.get(
+            "XICM_QWEN_72B_PATH",
+            "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-72B-Instruct/snapshots/495f39366efef23836d0cfae4fbe635880d2be31",
+        )
         
         ### load model from huggingface if not loaded from local file
         if not os.path.exists(model_name):
@@ -156,18 +172,25 @@ def load_weight(savedir):
 
     print("loading %s"%model_name)
 
-    llm = LLM(
-        model=model_name,
-        tensor_parallel_size = torch.cuda.device_count(),
-        # max_model_len=16464,
-        gpu_memory_utilization=0.8,
-        trust_remote_code=False,
-    )
+    llm_kwargs = {
+        "model": model_name,
+        "tensor_parallel_size": torch.cuda.device_count(),
+        "gpu_memory_utilization": float(os.environ.get("XICM_VLLM_GPU_MEMORY_UTILIZATION", "0.8")),
+        "trust_remote_code": is_vl_model,
+    }
+    max_model_len = os.environ.get("XICM_VLLM_MAX_MODEL_LEN")
+    if max_model_len:
+        llm_kwargs["max_model_len"] = int(max_model_len)
+    if is_vl_model:
+        llm_kwargs["limit_mm_per_prompt"] = {"image": int(os.environ.get("XICM_VL_MAX_IMAGES", "2"))}
+
+    llm = LLM(**llm_kwargs)
     processor = AutoProcessor.from_pretrained(model_name,
-        trust_remote_code=False)
+        trust_remote_code=is_vl_model)
         
     components['llm'] = llm
     components['processor']=processor
+    components['is_vl_model'] = is_vl_model
 
     return components
 

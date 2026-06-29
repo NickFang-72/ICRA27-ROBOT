@@ -5,7 +5,7 @@ import json
 import numpy as np
 from PIL import Image
 import os
-from utils import SCENE_BOUNDS, ROTATION_RESOLUTION, discrete_euler_to_quaternion, CAMERAS
+from utils import SCENE_BOUNDS, ROTATION_RESOLUTION, discrete_euler_to_quaternion, quaternion_to_discrete_euler, CAMERAS
 from openai import OpenAI
 from transformers import AutoModelForCausalLM, AutoTokenizer, Qwen2VLForConditionalGeneration, AutoProcessor
 import torch
@@ -20,6 +20,8 @@ class CrossTaskICLAgent(Agent):
         self.task_name = task_name
         self.demo_num_per_icl = demo_num_per_icl
         self.front_rgb_path=None
+        self.vl_front_rgb_path=None
+        self.vl_overhead_rgb_path=None
         self.seed=seed
         self.ranking_method=ranking_method
 
@@ -30,16 +32,98 @@ class CrossTaskICLAgent(Agent):
                 "Each seen demonstration contains a task instruction, per-key-action observations, the corresponding 7D actions, "
                 "and optional geometry/affordance descriptions depending on the ablation. "
                 "You will then receive one unseen query with only its current observation, task instruction, and the same descriptor types. "
-                "Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to the retrieved seen demonstrations. "
+                "The retrieved demonstrations are action, contact, motion, or geometry analogies; their object identity and final goal may differ from the unseen query. "
+                "Use the unseen query descriptors, especially its goal-state/contact-pose descriptor when present, as the desired success state. "
+                "Your job is to infer the unseen task's key 7D action sequence by comparing the current unseen scene to compatible retrieved seen demonstrations. "
                 "Do not use future observations, after-states, unseen demonstrations, or ground-truth unseen actions. "
                 "Return only a Python-style list of 7D action lists. Do not output anything else."
             )
+            if self._is_closed_loop():
+                self.SYSTEM_PROMPT += (
+                    " In closed-loop mode, predict only the next useful primitive action for the current observation. "
+                    "After that primitive executes, you will observe the scene again and correct the next action."
+                )
         else:
             self.SYSTEM_PROMPT = "You are a Franka Panda robot with a parallel gripper. We provide you with some demos from some seen tasks, in the format of [task_instruction, observation]>[ 7-dim action_1, 7-dim action_2, ..., 7-dim action_N ]. Then you will receive an unseen task instruction with a new observation, and you need to output a list of 7-dim actions that match the trends in the demos. Do not output anything else."
 
 
     def _is_v4(self):
         return "v4" in self.ranking_method
+
+    def _is_closed_loop(self):
+        normalized = self.ranking_method.replace("-", "_")
+        return "closed_loop" in normalized or ".cl" in normalized
+
+    def _closed_loop_max_replans(self):
+        return max(1, int(os.environ.get("XICM_CLOSED_LOOP_MAX_REPLANS", "4")))
+
+    def _closed_loop_should_replan(self):
+        return self._is_closed_loop() and self.closed_loop_replans < self._closed_loop_max_replans()
+
+    def _low_dim_state_summary(self, observation):
+        state = observation.get("low_dim_state")
+        if state is None:
+            return "unknown"
+        try:
+            values = state.squeeze().detach().cpu().numpy().astype(float).tolist()
+        except Exception:
+            try:
+                values = np.array(state).squeeze().astype(float).tolist()
+            except Exception:
+                return "unknown"
+        if not isinstance(values, list) or len(values) < 22:
+            return "unknown"
+        gripper_open = values[14]
+        gripper_pose = values[15:22]
+        pose_text = ", ".join(f"{value:.4f}" for value in gripper_pose)
+        return f"gripper_open={gripper_open:.3f}; gripper_pose_xyzquat=[{pose_text}]"
+
+    def _closed_loop_prompt_suffix(self, step, observation):
+        history = self.closed_loop_history[-6:]
+        history_lines = [
+            f"- step {item['step']}: action_7d={item['action_7d']}"
+            for item in history
+        ] or ["- none"]
+        return "\n".join(
+            [
+                "",
+                "Closed-loop execution mode:",
+                f"- Current environment step: {step}",
+                f"- Current robot state: {self._low_dim_state_summary(observation)}",
+                "- Previously executed primitive actions in this episode:",
+                *history_lines,
+                "- Re-observe the current scene, infer the current subgoal, and output only the next primitive 7D action.",
+                "- The next action should make immediate progress from the current state, not replay the whole original plan.",
+                "- If the object is already grasped, do not predict another grasp; move toward the target relation.",
+                "- If the object is already at the target relation, output a small release/retract or no-op-like finishing primitive.",
+                "- Return only one compact JSON object with fields current_subgoal and next_action_7d, where next_action_7d is [x,y,z,roll,pitch,yaw,gripper].",
+            ]
+        )
+
+    def _continuous_action_to_discrete(self, continuous_action):
+        action = np.asarray(continuous_action, dtype=float)
+        bounds = SCENE_BOUNDS
+        res = (bounds[3:] - bounds[:3]) / 100
+        trans = np.floor((action[:3] - bounds[:3]) / res).astype(int)
+        trans = np.clip(trans, 0, 99).tolist()
+        try:
+            rot = quaternion_to_discrete_euler(action[3:7]).astype(int).tolist()
+        except Exception:
+            rot = [0, 0, 0]
+        grip_index = 7 if len(action) > 7 else 6
+        gripper = int(round(float(action[grip_index]))) if len(action) > grip_index else 1
+        return [*trans, *rot, gripper]
+
+    def _use_query_images(self):
+        return bool(getattr(self, "components", {}).get("is_vl_model", False))
+
+    def _messages_have_images(self, messages):
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, list):
+                if any(isinstance(item, dict) and item.get("type") == "image" for item in content):
+                    return True
+        return False
 
     def _generate_text(self, messages, max_tokens=256):
         prompt = self.components["processor"].apply_chat_template(
@@ -51,6 +135,15 @@ class CrossTaskICLAgent(Agent):
         llm_inputs = {
             "prompt": prompt
         }
+        if self._messages_have_images(messages):
+            image_inputs, video_inputs = process_vision_info(messages)
+            multi_modal_data = {}
+            if image_inputs:
+                multi_modal_data["image"] = image_inputs
+            if video_inputs:
+                multi_modal_data["video"] = video_inputs
+            if multi_modal_data:
+                llm_inputs["multi_modal_data"] = multi_modal_data
 
         sampling_params = SamplingParams(
             temperature=0.1,
@@ -62,6 +155,40 @@ class CrossTaskICLAgent(Agent):
 
         outputs = self.components["llm"].generate([llm_inputs], sampling_params=sampling_params)
         return outputs[0].outputs[0].text
+
+    def _build_final_messages(self, user_prompt):
+        system_prompt = self.SYSTEM_PROMPT
+        if not self._use_query_images():
+            return [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+
+        system_prompt = (
+            f"{system_prompt} You may also receive front and overhead RGB images "
+            "of the current unseen query. Use those images only as the current "
+            "initial observation. If the text prompt includes geometry, goal-state, "
+            "or contact descriptors, treat those descriptors as the authoritative "
+            "structured hints for the current ablation."
+        )
+        content = [
+            {
+                "type": "text",
+                "text": (
+                    "Current unseen query images are attached below. "
+                    "First image: front RGB view. Second image: overhead/top RGB view."
+                ),
+            }
+        ]
+        if self.vl_front_rgb_path:
+            content.append({"type": "image", "image": self.vl_front_rgb_path})
+        if self.vl_overhead_rgb_path:
+            content.append({"type": "image", "image": self.vl_overhead_rgb_path})
+        content.append({"type": "text", "text": user_prompt})
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content},
+        ]
 
     def _split_v4_prompt(self, user_prompt):
         stage1_marker = "<<<V4_STAGE1_PROMPT>>>"
@@ -76,14 +203,20 @@ class CrossTaskICLAgent(Agent):
         stage1_prompt, stage2_context = self._split_v4_prompt(user_prompt)
 
         stage1_system_prompt = (
-            "You are a Franka Panda robot planning at the semantic intent level. "
-            "Your output must be a compact JSON object describing the manipulation target, relation, orientation, action primitive, direction, contact point, gripper plan, and constraints. "
-            "Do not output 7D actions in this stage."
+            "You are a Franka Panda robot planner. First answer the high-level question: "
+            "what physical manipulation should the robot perform in the current unseen scene? "
+            "Use retrieved demos only as analogies for contact mode, relation, motion direction, and gripper timing. "
+            "Ground the plan in the unseen current observation: copy target_current_coordinate and reference_coordinate exactly when present, "
+            "and name the active_reference_part rather than a generic support object. "
+            "Return only one compact JSON object with the requested semantic fields. Do not output 7D actions in this stage."
         )
         stage2_system_prompt = (
             "You are a Franka Panda robot with a parallel gripper. "
-            "Use the semantic manipulation plan and retrieved seen demonstrations to predict the unseen task's key 7D action sequence. "
-            "Return only a Python-style list of 7D action lists. Do not output anything else."
+            "Use the semantic manipulation plan, the current unseen observation, and compatible retrieved trajectories to answer: "
+            "what action should the robot take? "
+            "First write a short relative_action_sketch in simple robot motion language, then use that sketch to accurately predict key_actions_7d. "
+            "Return only one compact JSON object with exactly two fields: relative_action_sketch and key_actions_7d. "
+            "key_actions_7d must be a list of [x, y, z, roll, pitch, yaw, gripper] integer lists, where gripper is 1=open and 0=closed."
         )
 
         print(stage1_system_prompt)
@@ -102,7 +235,8 @@ class CrossTaskICLAgent(Agent):
         plan_insert = (
             "Stage 1 semantic manipulation plan:\n"
             f"{semantic_plan}\n\n"
-            "Use this plan as the primary task intent, while using the retrieved trajectories for coordinate/action style."
+            "Use this plan as the primary task intent. Before final 7D actions, write a relative action sketch that follows the plan, "
+            "then convert that sketch into the final key_actions_7d using the current observation and compatible retrieved trajectory rhythms."
         )
         stage2_prompt = stage2_context.replace("<<<V4_STAGE2_PLAN_INSERT_HERE>>>", plan_insert, 1)
         stage2_prompt = stage2_prompt.replace(
@@ -121,7 +255,7 @@ class CrossTaskICLAgent(Agent):
                 {"role": "system", "content": stage2_system_prompt},
                 {"role": "user", "content": stage2_prompt},
             ],
-            max_tokens=256,
+            max_tokens=512,
         )
         print(f"Prediction:", output_text)
         return output_text
@@ -149,6 +283,15 @@ class CrossTaskICLAgent(Agent):
             rgb_img = np.clip(((rgb_img + 1.0) / 2 * 255).astype(np.uint8), 0, 255)
 
             rgb_dict[camera] = rgb_img
+            if camera in {"front", "overhead"}:
+                query_view_dir = os.path.join(self.savedir, 'rgb_dir', 'query_views', str(self.episode_id))
+                os.makedirs(query_view_dir, exist_ok=True)
+                query_view_path = os.path.join(query_view_dir, f'{camera}.png')
+                Image.fromarray(rgb_img).save(query_view_path)
+                if camera == "front":
+                    self.vl_front_rgb_path = query_view_path
+                elif camera == "overhead":
+                    self.vl_overhead_rgb_path = query_view_path
 
             mask_id_to_sim_name.update(kwargs["mapping_dict"][f"{camera}_mask_id_to_name"])
 
@@ -160,8 +303,10 @@ class CrossTaskICLAgent(Agent):
             point_cloud = obs[f'{camera}_point_cloud'].cpu().squeeze().permute(1, 2, 0).numpy()
             point_cloud_dict[camera] = point_cloud
 
-        if len(self.actions) == 0:
+        if len(self.actions) == 0 or self._closed_loop_should_replan():
             user_prompt = self.handler.get_user_prompt_ranking(mask_dict, mask_id_to_sim_name, point_cloud_dict, custom_num_demos=self.demo_num_per_icl, taskname=lang_goal, image_path=self.front_rgb_path, seed=self.seed, ranking_metric=self.ranking_method)   
+            if self._closed_loop_should_replan():
+                user_prompt += self._closed_loop_prompt_suffix(step, obs)
 
             if self._is_v4():
                 return self._run_v4_semantic_bottleneck(user_prompt)
@@ -172,10 +317,7 @@ class CrossTaskICLAgent(Agent):
 
             print(user_prompt)
 
-            messages = [
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt}
-                ]
+            messages = self._build_final_messages(user_prompt)
 
 
             ########################### vllm local deploy #####################################
@@ -195,12 +337,47 @@ class CrossTaskICLAgent(Agent):
                 valid_lists.append(items)
         return valid_lists
 
+    def _extract_key_actions_7d(self, text):
+        cleaned = str(text).strip()
+        if "```" in cleaned:
+            cleaned = re.sub(r"^```(?:json|python)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+        try:
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, dict) and "next_action_7d" in parsed:
+                action = parsed["next_action_7d"]
+                if isinstance(action, list) and len(action) == 7:
+                    return [[int(round(float(value))) for value in action]]
+            if isinstance(parsed, dict) and "action_7d" in parsed:
+                action = parsed["action_7d"]
+                if isinstance(action, list) and len(action) == 7:
+                    return [[int(round(float(value))) for value in action]]
+            if isinstance(parsed, dict) and "key_actions_7d" in parsed:
+                actions = parsed["key_actions_7d"]
+                if isinstance(actions, list):
+                    return [
+                        [int(round(float(value))) for value in action]
+                        for action in actions
+                        if isinstance(action, list) and len(action) == 7
+                    ]
+            if isinstance(parsed, list):
+                return [
+                    [int(round(float(value))) for value in action]
+                    for action in parsed
+                    if isinstance(action, list) and len(action) == 7
+                ]
+        except Exception:
+            pass
+        return self.re_match(cleaned)
+
     def _postprocess(self, output_text):
         try:
-            actions = self.re_match(str(output_text))
+            actions = self._extract_key_actions_7d(str(output_text))
+            self._last_discrete_actions = actions
             print("parsed actions: ", actions)
         except Exception as e:
             actions = [[57, 49, 87, 0, 39, 0, 1] for _ in range(26)]
+            self._last_discrete_actions = actions
             print(e)
             print('Error when parsing actions. Falling back to default.')
         
@@ -239,12 +416,31 @@ class CrossTaskICLAgent(Agent):
     def act(self, step: int, observation: dict,
             deterministic=False, **kwargs) -> ActResult:
         # inference
-        output_text = self._preprocess(observation, step, **kwargs)
-        if len(self.actions) == 0:
+        if self._closed_loop_should_replan():
+            output_text = self._preprocess(observation, step, **kwargs)
             output = self._postprocess(output_text)
-            self.actions = output
+            if len(output) == 0:
+                output = [[57, 49, 87, 0, 39, 0, 1]]
+            continuous_action = output[0]
+            self.closed_loop_replans += 1
+            discrete_action = (
+                self._last_discrete_actions[0]
+                if getattr(self, "_last_discrete_actions", None)
+                else self._continuous_action_to_discrete(continuous_action)
+            )
+            self.closed_loop_history.append(
+                {
+                    "step": int(self.step),
+                    "action_7d": discrete_action,
+                }
+            )
+        else:
+            output_text = self._preprocess(observation, step, **kwargs)
+            if len(self.actions) == 0:
+                output = self._postprocess(output_text)
+                self.actions = output
             
-        continuous_action = self.actions.pop(0)
+            continuous_action = self.actions.pop(0)
 
         self.step += 1
         
@@ -269,6 +465,9 @@ class CrossTaskICLAgent(Agent):
         self.episode_id += 1
         self._prev_action = None
         self.actions = []
+        self.closed_loop_replans = 0
+        self.closed_loop_history = []
+        self._last_discrete_actions = []
 
     def load_weights(self, savedir: str, components={}):
         # no weight to load

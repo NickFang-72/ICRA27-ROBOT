@@ -4,6 +4,8 @@
 Run this on the CAIR machine inside the X-ICM environment after AGNOSTOS data is
 linked. It does not modify the vanilla X-ICM prompt code; it only writes a JSON
 payload that can be consumed by render_xicm_geometry_affordance_prompt.py.
+Clean v1 treats primitive geometry as retrieval evidence and RoboPoint output
+as optional contact hints, not symbolic affordance descriptors.
 """
 
 from __future__ import annotations
@@ -88,7 +90,7 @@ def _task_and_episode_from_path(episode_path: Path) -> tuple[str, int]:
 def _lookup_descriptors(cache: dict[str, dict[str, Any]], task: str, episode_id: int, episode_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     keys = [str(episode_path), f"{task}:{episode_id}", f"{task}_episode{episode_id}"]
     row = next((cache[key] for key in keys if key in cache), {})
-    return row.get("geometry_g_i") or {}, row.get("affordance_a_i") or {}
+    return row.get("geometry_g_i") or {}, row.get("contact_hints_i") or row.get("affordance_a_i") or {}
 
 
 def _import_xicm_helpers(xicm_root: Path):
@@ -173,7 +175,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         episode_path = Path(item["episode_path"])
         task, episode_id = _task_and_episode_from_path(episode_path)
         task_instruction, steps = _demo_to_steps(xicm_form, episode_path, task)
-        geometry_g_i, affordance_a_i = _lookup_descriptors(descriptor_cache, task, episode_id, episode_path)
+        geometry_g_i, contact_hints_i = _lookup_descriptors(descriptor_cache, task, episode_id, episode_path)
         demos.append(
             {
                 "rank": rank,
@@ -184,11 +186,10 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "retrieval_components": {
                     "s_dyn": item.get("s_dyn"),
                     "s_geo": item.get("s_geo"),
-                    "s_aff": item.get("s_aff"),
                 },
                 "task_instruction": task_instruction,
                 "geometry_g_i": geometry_g_i,
-                "affordance_a_i": affordance_a_i,
+                "contact_hints_i": contact_hints_i,
                 "steps": steps,
             }
         )
@@ -197,7 +198,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "task_instruction": args.query_task_instruction,
         "observation": args.query_observation,
         "geometry_g_j": _read_json(args.query_geometry),
-        "affordance_a_j": _read_json(args.query_affordance),
+        "contact_hints_j": _read_json(args.query_affordance),
     }
     return {"retrieved_demos": demos, "query": query}
 
@@ -208,11 +209,11 @@ def main() -> None:
     parser.add_argument("--seen-episode", action="append", help="Path to seen task episodeN directory; repeat for top-k demos")
     parser.add_argument("--retrieval-ranking", help="JSON ranking from score_xicm_geometry_affordance_retrieval.py")
     parser.add_argument("--top-k", type=int, help="Limit ranked retrieved demos before prompt preparation")
-    parser.add_argument("--descriptor-cache", help="Optional JSON/JSONL cache with geometry_g_i and affordance_a_i")
+    parser.add_argument("--descriptor-cache", help="Optional JSON/JSONL cache with geometry_g_i and contact_hints_i")
     parser.add_argument("--query-task-instruction", required=True)
     parser.add_argument("--query-observation", required=True, help="Current unseen X-ICM observation text only")
     parser.add_argument("--query-geometry", help="Optional JSON file for geometry_g_j")
-    parser.add_argument("--query-affordance", help="Optional JSON file for affordance_a_j")
+    parser.add_argument("--query-affordance", help="Optional JSON file for contact_hints_j (legacy flag name)")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 

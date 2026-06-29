@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # Run the v4 geometry+affordance X-ICM ablation on CAIR.
 # v4 keeps dynamics-anchored retrieval, adds mechanical filtering, and uses a
-# two-stage semantic bottleneck: semantic plan first, 7D action prediction second.
+# two-stage semantic bottleneck: semantic plan first, then one Stage 2 call that
+# emits a relative action sketch plus final 7D actions.
 
 XICM_ROOT="${XICM_ROOT:-/data/yf23/projects/ICRA27-ROBOT/X-ICM}"
 CACHE_ROOT="${CACHE_ROOT:-/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache}"
@@ -55,7 +56,7 @@ write_progress() {
     "max_per_task": $MAX_PER_TASK,
     "max_per_family": $MAX_PER_FAMILY
   },
-  "prompt_style": "two_stage_semantic_bottleneck",
+  "prompt_style": "two_stage_semantic_bottleneck_with_relative_action_sketch",
   "log_path": "$log_path",
   "message": "$message",
   "updated_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -115,7 +116,7 @@ write_progress "running" "$completed" "$log_path" "Started v4 semantic bottlenec
     echo "ranking=$RANKING_METHOD"
     echo "weights alpha=$ALPHA beta=$BETA gamma=$GAMMA delta_mechanical=$DELTA penalty=$PENALTY max_per_task=$MAX_PER_TASK max_per_family=$MAX_PER_FAMILY"
     echo "method=$method"
-    echo "prompt_style=two_stage_semantic_bottleneck"
+    echo "prompt_style=two_stage_semantic_bottleneck_with_relative_action_sketch"
     echo "started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     bash scripts/eval_XICM.sh "$SEEDS" "$EPISODES" "$MODEL_NAME" "$DEMO_NUM_PER_ICL" "$GPU_ID" "$RANKING_METHOD" "true"
     echo "finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

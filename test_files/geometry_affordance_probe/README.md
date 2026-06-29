@@ -1,15 +1,28 @@
 # Geometry/Affordance Probe
 
-This folder contains scripts and review outputs for the X-ICM-style geometry and affordance retrieval pilot.
+This folder contains the reproducible code for the X-ICM-style geometry and affordance retrieval pilot. Generated review packets, result tables, figures, and CAIR pulls live here locally, but are intentionally ignored by Git.
 
 ## Structure
 
-- `batch_01/`: first 12 seen-task demos.
-- `batch_02/`: second 12 seen-task demos, excluding batch 1 demo IDs.
 - `scripts/`: CAIR/runtime scripts for sampling, Qwen geometry extraction, RoboPoint affordance extraction, normalization, review index generation, and prompt rendering/preparation.
 - `cair_setup_scripts/`: setup/download runner scripts used on CAIR.
 - `fixtures/`: lightweight local fixtures for prompt-format checks.
-- `ablation_results/`: local copies of completed CAIR benchmark logs plus regenerated score tables.
+- `batch_*/`: local-only generated seen-demo review batches.
+- `ablation_results/`: local-only copies of CAIR benchmark logs plus regenerated score tables.
+- `review/`: local-only human-review packets and rendered debug views.
+- `figures/`: local-only generated diagrams and paper/deck figures.
+
+## Git Tracking Policy
+
+Keep source code, launch scripts, fixtures, and documentation in Git. Keep generated artifacts out of Git:
+
+- demo/review images
+- model descriptor JSON from Qwen/RoboPoint runs
+- CAIR logs and pulled benchmark folders
+- ablation CSV/Markdown/JSON result tables
+- generated figures and presentation exports
+
+The ignored folders remain available on this machine. If another clone needs them, regenerate them with the scripts here or pull them again from CAIR.
 
 ## Model Roles
 
@@ -18,7 +31,7 @@ This folder contains scripts and review outputs for the X-ICM-style geometry and
 
 ## Review Workflow
 
-Open each batch's `review_index.md` first. For a deeper per-demo view, open:
+If local batch folders are present, open each batch's `review_index.md` first. For a deeper per-demo view, open:
 
 `human_check_bundle/<demo_id>/combined_review.json`
 
@@ -54,7 +67,7 @@ any geometry/affordance trial.
 | v1 | `lang_vis.out.geo_aff` | 18 | Add cached Qwen geometry `g_i/g_j` and RoboPoint affordance `a_i/a_j` into retrieval and prompt context. | Coarse descriptor words sometimes pulled in bad analogies. Average `20.87`, below the X-ICM 7B rerun. |
 | v2 | `lang_vis.out.geo_aff_v2` | 6, 8, 10 | Make dynamics dominant again, add interaction signatures, transfer penalties, and prompt-visible attention bias. | Better than v1 but still below baseline. Best compact average tied at `21.74` for `k=6` and `k=8`. The first `k=18` v2 attempt overflowed context. |
 | v3 | `lang_vis.out.geo_aff_v3` | 6 | Retrieve by contact-mode/mechanical compatibility with stronger conflict penalties and diversity caps. | Average `20.00`. Retrieval became more physically opinionated, but the LLM still had to convert descriptor-heavy multi-demo context directly into one 7D chain. |
-| v4 | `lang_vis.out.geo_aff_v4` | 6 | Two-stage semantic bottleneck: Stage 1 turns descriptor context into a simple intent; Stage 2 turns that intent plus seen trajectories into 7D actions. | Running/under test. This tests whether separating "understand the manipulation" from "emit robot coordinates" reduces noisy demo mixing. |
+| v4 | `lang_vis.out.geo_aff_v4` | 6 | Two-stage semantic bottleneck: Stage 1 turns descriptor context into a grounded intent; Stage 2 emits a relative action sketch plus final 7D actions in one call. | Improved clean rerun active on CAIR. The old partial 4/23 v4 outputs were archived before relaunch. |
 
 Short difference between v2, v3, and v4:
 
@@ -64,8 +77,9 @@ Short difference between v2, v3, and v4:
   influence as dynamics, penalizes known bad analogies harder, and prevents the
   top-k prompt from being dominated by repeated near-duplicate demos.
 - v4 changes the prompt architecture. It still retrieves once, but calls the
-  same LLM twice: first for a clean semantic manipulation plan, then for the
-  final 7D key actions.
+  same LLM twice. Stage 1 produces a clean semantic manipulation plan. Stage 2
+  is one call that first emits `relative_action_sketch`, then emits
+  `key_actions_7d` for the evaluator.
 
 As of the latest completed CAIR run, v2 is complete and v3 `k=6` is complete
 with an average score of `20.00`. V3 did not help because the model still had
@@ -76,7 +90,7 @@ V4 tests a cleaner split:
 
 ```text
 Stage 1: descriptors + scene summaries -> semantic manipulation plan
-Stage 2: semantic plan + seen observation/action trajectories + unseen current observation -> 7D actions
+Stage 2: semantic plan + seen observation/action trajectories + unseen current observation -> relative action sketch + 7D actions
 ```
 
 The active v4 method name is:
@@ -89,6 +103,16 @@ The v4 progress file is:
 
 ```text
 /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_ablations/progress_v4.json
+```
+
+The current improved v4 rerun started from an empty active v4 method folder.
+The earlier stopped partial run is archived under `_archived_partial_v4` so it
+does not contaminate the active wide table.
+
+The stopped-run review packet for the next meeting is:
+
+```text
+test_files/geometry_affordance_probe/review/2026-06-22_v4_research_holes
 ```
 
 ## V1 Geometry/Affordance Ablation
@@ -283,7 +307,7 @@ The main lesson from v3 is that improving retrieval alone is not enough if the
 generation prompt still asks the 7B model to simultaneously understand the task,
 resolve conflicting demos, and emit precise action coordinates.
 
-Current v3 run:
+Completed v3 run:
 
 ```text
 lang_vis.out.geo_aff_v3
@@ -304,13 +328,13 @@ max_per_task = 2
 max_per_family = 3
 ```
 
-Launch v3 on CAIR:
+Historical v3 launch command:
 
 ```bash
 ssh cair 'cd /data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache && nohup bash scripts/run_geometry_affordance_v3_on_cair.sh > logs/run_geometry_affordance_v3.nohup.log 2>&1 & echo pid=$!'
 ```
 
-Watch progress from the Mac:
+Historical v3 one-shot progress check:
 
 ```bash
 ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_v3_progress_from_local.sh
@@ -381,16 +405,21 @@ scene summary s_j
 ```
 
 Stage 1 must output only a compact semantic JSON plan. It should identify the
-manipulation in simple words, such as target object, reference object, action
-primitive, motion direction, contact point, gripper plan, success relation, and
-constraints.
+manipulation in simple words and bind that plan to the unseen observation's
+object coordinates. In particular, it should copy the target object's current
+coordinate, choose the active reference part, and copy that reference
+coordinate. This prevents errors such as aiming at `stand_base` when the active
+target should be `holder`.
 
 Example Stage 1 output:
 
 ```json
 {
   "target_object": "charger plug",
+  "target_current_coordinate": [61, 52, 29],
   "reference_object": "computer socket",
+  "active_reference_part": "socket",
+  "reference_coordinate": [50, 22, 29],
   "target_location_relation": "out of the socket",
   "target_orientation": "aligned with the plug axis",
   "action_primitive": "pull",
@@ -421,11 +450,29 @@ Stage 2 does not receive the full geometry/affordance blocks again. That is an
 intentional bottleneck: descriptor information must pass through the Stage 1
 semantic plan instead of being dumped into the final action prompt.
 
-Stage 2 then outputs only:
+Stage 2 is a single LLM call, but it now has two fields in one JSON output:
 
-```text
-[[x, y, z, roll, pitch, yaw, gripper], ...]
+```json
+{
+  "relative_action_sketch": [
+    "approach the target object",
+    "close gripper on the target",
+    "move toward the reference coordinate",
+    "align with the relevant axis or contact surface",
+    "lower/place/pull/press/rotate as required",
+    "open gripper or retreat when complete"
+  ],
+  "key_actions_7d": [
+    [x, y, z, roll, pitch, yaw, gripper]
+  ]
+}
 ```
+
+The evaluator still consumes only `key_actions_7d`; `relative_action_sketch`
+is an internal bridge to make the final numeric action sequence less noisy.
+This follows the same practical lesson as VLA and embodied-reasoning prompts:
+ask the model what action should be taken, make it represent the motion in a
+clean action language first, then emit the robot action representation.
 
 The intended behavior is not to average all retrieved demos. Stage 2 should use
 the semantic plan to choose one or a few compatible demo rhythms, then adapt the
@@ -437,13 +484,52 @@ V4 is testing whether this decomposition fixes the v3 failure mode:
 
 ```text
 v3: descriptors + many trajectories -> 7D actions
-v4: descriptors -> semantic intent -> 7D actions
+v4: descriptors -> semantic intent -> relative action sketch -> 7D actions
 ```
 
 A v4 score above v2/v3 would suggest that the semantic bottleneck helps the 7B
 model avoid noisy trajectory mixing. A v4 score below v2/v3 would suggest that
 the extra LLM call either loses important descriptor detail, introduces semantic
 errors, or still cannot recover from poor retrieved demos.
+
+### Saved Next-Step Idea: Stage 1 Demo Role Selection
+
+If the current v4 rerun still struggles, the next prompt-side idea is to let
+Stage 1 assign roles to the retrieved demos before Stage 2 sees the action
+trajectories. Instead of treating all retrieved examples equally, Stage 1 would
+label each demo as something like `primary_motion_template`,
+`gripper_timing_reference`, `axis_or_contact_reference`, or `ignore`.
+
+This would allow a slightly larger retrieval pool, likely `k=8` or `k=10`,
+while still asking the model to down-select the useful examples before action
+prediction. The goal is not to return to noisy `k=18`; it is to retrieve a few
+extra candidates and make Stage 1 explicitly say which demos should guide Stage
+2 and which demos should be ignored because their mechanics conflict with the
+unseen query.
+
+Example role block:
+
+```json
+{
+  "demo_roles": [
+    {
+      "demo_rank": 1,
+      "role": "primary_motion_template",
+      "reason": "same hole-over-vertical-stand mechanics"
+    },
+    {
+      "demo_rank": 2,
+      "role": "gripper_timing_reference",
+      "reason": "same grasp-lift-release rhythm"
+    },
+    {
+      "demo_rank": 3,
+      "role": "ignore",
+      "reason": "similar object placement but wrong contact geometry"
+    }
+  ]
+}
+```
 
 ### V4 Commands
 
@@ -457,6 +543,13 @@ Watch progress from the Mac:
 
 ```bash
 ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_xicm_v4_progress_from_local.sh
+```
+
+Watch progress continuously and update local tables whenever new strict final
+scores appear:
+
+```bash
+INTERVAL_SECONDS=120 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_v4_progress_from_local.sh
 ```
 
 Update local result tables after completed strict final scores appear:
@@ -484,7 +577,7 @@ paths.
 
 ## Folder Hygiene
 
-Generated `.DS_Store`, `__pycache__`, `.pyc`, local `.pid`, `.lock`, and runtime `.log` files are ignored or treated as disposable workspace clutter. Do not delete benchmark result CSV/Markdown files, pulled CAIR logs, descriptor caches, or demo data unless a user explicitly asks.
+Generated `.DS_Store`, `__pycache__`, `.pyc`, local `.pid`, `.lock`, runtime `.log`, result CSV/Markdown/JSON, pulled CAIR logs, descriptor caches, review packets, demo images, and generated figures are ignored or treated as local workspace artifacts. Keep them locally when useful, but do not commit them.
 
 To launch the full seen-demo descriptor cache on CAIR:
 
