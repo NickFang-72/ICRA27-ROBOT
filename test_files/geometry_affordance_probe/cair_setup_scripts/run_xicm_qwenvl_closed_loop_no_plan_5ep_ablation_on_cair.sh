@@ -52,4 +52,4 @@ qwenvl_closed_loop_geo_target_pose_contact_5eps_seed0|lang_vis.out.geo.aff.close
 CONFIG
 )}"
 
-bash "$SCRIPT_DIR/run_xicm_v1_10ep_component_ablation_on_cair.sh"
+bash "$SCRIPT_DIR/run_xicm_qwenvl_ablation_matrix_on_cair.sh"

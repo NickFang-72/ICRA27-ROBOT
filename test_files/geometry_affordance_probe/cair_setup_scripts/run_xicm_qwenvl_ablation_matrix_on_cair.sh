@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Launch X-ICM v1 component ablations on CAIR:
-#   1) geometry retrieval + target-pose prompt
-#   2) contact points prompt only
-#   3) geometry retrieval + target-pose prompt + contact points prompt
+# Generic CAIR launcher for Qwen/QwenVL X-ICM ablation matrices.
 #
-# Each row uses seeds 0,50,99, 10 episodes per task, k=18 ICL demos, and
-# Qwen2.5-7B-Instruct. Target-pose and contact points are prompt-only. Contact
-# gamma stays 0.0. The contact-only row uses dynamic retrieval only.
+# Wrapper scripts set METHOD_CONFIG_TEXT and the run/cache paths for a specific
+# experiment. When run directly, the defaults still mirror the older v1 component
+# ablation, so prefer calling a wrapper such as:
+#
+#   run_xicm_qwenvl_closed_loop_no_plan_5ep_ablation_on_cair.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"

@@ -2,12 +2,18 @@
 
 This repository is Nicholas's working project for an ICRA 2027 robot manipulation idea built on top of **AGNOSTOS** and **X-ICM**.
 
-The current direction is simple and modular: follow the X-ICM pipeline, but add two separate retrieval features before the in-context LLM prediction step:
+The current direction is the closed-loop no-plan QwenVL ablation:
 
-1. `g_i`: object-centric **geometric features** from Qwen2.5-VL.
-2. `a_i`: manipulation **affordance/contact features** from RoboPoint.
+1. cache seen-demo **geometry and target-pose features** with Qwen2.5-VL from front plus overhead views;
+2. retrieve demonstrations with X-ICM dynamics plus geometry/target-pose scoring;
+3. prompt QwenVL with the current scene images and retrieved seen trajectories;
+4. execute one primitive, observe again, retrieve again, and continue for the configured closed-loop replans;
+5. compare geometry-only retrieval against geometry plus contact-point prompt hints.
 
-The goal is to test whether X-ICM retrieves better seen demonstrations when the original dynamics similarity is augmented with geometry and affordance similarity.
+Plan-guided retrieval and the older semantic-plan experiments are now legacy
+paths. The cleaned script map is:
+
+- `test_files/geometry_affordance_probe/SCRIPT_INDEX.md`
 
 ## GitHub Push Policy
 
@@ -24,36 +30,35 @@ Local-only folders include:
 
 Those folders may contain CAIR logs, rendered observations, ablation CSVs, review packets, figures, and PowerPoint exports. They are useful working artifacts, but they should not be committed or pushed. Regenerate or pull them from CAIR when needed.
 
-## Trial Versions
+## Current Results
 
-This project now has four geometry/affordance trial lines. They should be kept conceptually separate even when the implementation shares `X-ICM/form_icl_demonstrations_crosstask_ranking.py`.
+The latest completed local comparison is:
 
-| Version | Ranking method | Main idea | Current status |
-|---|---|---|---|
-| v1 | `lang_vis.out.geo_aff` | Add Qwen geometry `g_i/g_j` and RoboPoint affordance `a_i/a_j` to retrieval and prompt context. | Completed ablation, average `20.87`; underperformed the original rerun. |
-| v2 | `lang_vis.out.geo_aff_v2` | Keep dynamics similarity as the anchor, add a precise interaction signature, transfer penalties, and prompt-visible attention bias. | Compact K sweep complete for `k=6,8,10`; best average tied at `21.74` for `k=6` and `k=8`. |
-| v3 | `lang_vis.out.geo_aff_v3` | Use contact-mode/mechanical compatibility, stronger conflict penalties, retrieval diversity caps, and explicit contact-mode prompt guidance. | Completed `k=6`, average `20.00`; failed to improve because the prompt still asked the model to turn many descriptor-heavy demos directly into one 7D action chain. |
-| v4 | `lang_vis.out.geo_aff_v4` | Test a semantic bottleneck: Stage 1 converts descriptor-heavy context into a grounded manipulation intent, then Stage 2 emits a relative action sketch plus final 7D actions in one call. | Improved `k=6` CAIR rerun launched from a clean v4 log folder. |
-
-The important difference between v2, v3, and v4 is where the extra structure enters. V2 uses descriptors as conservative retrieval tie-breakers. V3 tries to retrieve physically compatible demonstrations more aggressively, but still gives the LLM one large descriptor-and-trajectory prompt. V4 keeps the retrieval idea but splits prompting into two calls: Stage 1 states the manipulation intent in grounded words, and Stage 2 first writes a simple relative action sketch before emitting the final `key_actions_7d` list used by the evaluator.
-
-Baseline and ablation comparisons should use three seeds from now on: `0,50,99`, with `25` evaluation episodes per task per seed. The original paper X-ICM 7B artifact uses these same three seeds, so this is the fair comparison protocol.
-
-Current vanilla 3-seed baseline watcher:
-
-```bash
-INTERVAL_SECONDS=120 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_baseline_rerun_from_local.sh
+```text
+test_files/geometry_affordance_probe/ablation_results/closed_loop_no_plan_k4_k6_k8_k10_comparison_2026-06-30.csv
 ```
 
-Current improved v4 watcher:
+Summary averages:
 
-```bash
-INTERVAL_SECONDS=120 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_v4_progress_from_local.sh
+| Row | Average |
+|---|---:|
+| Qwen text baseline | 26.96 |
+| QwenVL front+overhead baseline | 28.70 |
+| closed loop geo, k10 | 15.65 |
+| closed loop geo+contact, k10 | 13.04 |
+| closed loop geo, k8 | 18.26 |
+| closed loop geo+contact, k8 | 15.65 |
+| closed loop geo, k6 | 17.39 |
+| closed loop geo+contact, k6 | 13.04 |
+| closed loop geo, k4 | 16.52 |
+| closed loop geo+contact, k4 | 13.04 |
+
+Older v1-v4 launchers, one-off review builders, and obsolete collectors now
+live under:
+
+```text
+test_files/geometry_affordance_probe/legacy/
 ```
-
-Saved next idea, if v4 still struggles: retrieve a slightly larger pool such as `k=8` or `k=10`, then have Stage 1 assign demo roles like `primary_motion_template`, `gripper_timing_reference`, `axis_or_contact_reference`, or `ignore` before Stage 2 sees the action trajectories. Avoid returning to noisy `k=18`.
-
-Directory organization is intentionally postponed as of 2026-06-21. Several v1/v2-related files are already edited in the working tree, and a local v2 watcher was active during this documentation pass. To avoid disturbing running or dirty trial state, do not move, rename, or reorganize trial scripts/logs until the worktree is clean and no watcher/evaluator is active.
 
 ## References
 
@@ -158,7 +163,7 @@ Useful `key_features` include:
 
 Prompt implementation:
 
-- `test_files/geometry_affordance_probe/scripts/run_qwen_geometry.py`
+- `test_files/geometry_affordance_probe/scripts/run_qwen_dual_view_geometry_target_pose.py`
 - Prompt constant: `GEOMETRY_PROMPT`
 
 The current prompt asks Qwen to return only valid JSON and includes this schema:
@@ -201,20 +206,18 @@ Example fields:
 }
 ```
 
-Prompt implementation:
+Current contact implementation:
 
-- `test_files/geometry_affordance_probe/scripts/run_robopoint_affordance.py`
-- Prompt constant: `QUESTION_TEMPLATE`
+- active closed-loop runs merge legacy seen-demo contact hints into the clean
+  geometry/target-pose cache inside
+  `test_files/geometry_affordance_probe/cair_setup_scripts/run_xicm_qwenvl_ablation_matrix_on_cair.sh`
+- `test_files/geometry_affordance_probe/scripts/project_robopoint_contacts_to_pointcloud.py`
+  remains available for contact diagnostics
 
-The current RoboPoint prompt is:
+The old direct RoboPoint extraction runner is archived under
+`test_files/geometry_affordance_probe/legacy/scripts/`.
 
-```text
-<image>
-Task instruction: {task}
-For robot manipulation, identify the best visible contact or grasp affordance points for accomplishing this task. Return several normalized image keypoints as a list of tuples [(x1, y1), ...] where x and y are between 0 and 1. After the list, add a short phrase naming the contact region and motion affordance.
-```
-
-After RoboPoint runs, `normalize_geometry_affordance_outputs.py` parses the contact points and normalizes symbolic affordance labels such as:
+The contact descriptor normalizes symbolic affordance labels such as:
 
 - `handle_grasp`
 - `rim_grasp`
