@@ -23,24 +23,13 @@ artifacts from the Git surface.
 | `cair_setup_scripts/run_rerank_top50_all23_1ep_video_on_cair.sh` | Runs one episode per unseen task with video recording enabled. |
 | `cair_setup_scripts/pull_rerank_top50_all23_1ep_video_from_cair.sh` | Pulls the video smoke review folder, MP4s, logs, and score CSV to local. |
 
-## Supporting Tracked Utilities
+## Remaining Local Helper
 
-These files are still useful for the active checkpoint but are not the main
-method entry point:
-
-| Script | Purpose |
-|---|---|
-| `scripts/apply_qwen_geometry_strict_rules.py` | Deterministic cleanup rules for QwenVL geometry descriptors. |
-| `scripts/cache_all_seen_geometry_affordance.py` | Builds the seen-demo manifest/cache used by descriptor retrieval. |
-| `scripts/prepare_xicm_key_action_trajectories.py` | Converts seen episodes into observation/action trajectory payloads. |
-| `scripts/project_robopoint_contacts_to_pointcloud.py` | Projects diagnostic contact points into scene geometry. |
-| `scripts/qwen_retrieval_geometry_rules.py` | Shared geometry/target-pose descriptor rules. |
-| `scripts/render_xicm_geometry_affordance_prompt.py` | Renders prompt payloads for inspection. |
-| `scripts/run_qwen_dual_view_geometry_target_pose.py` | Extracts dual-view geometry and target-pose descriptors. |
-| `scripts/run_qwen_dual_view_retrieval_geometry.py` | Extracts retrieval-oriented scene descriptors. |
-| `scripts/score_xicm_geometry_affordance_retrieval.py` | Scores retrieved demos with geometry/contact descriptor terms. |
-| `scripts/tune_geometry_affordance_weights.py` | Legacy tuning helper for descriptor weights. |
-| `scripts/tune_seen_validation_from_xicm_features.py` | Tunes retrieval features from seen validation/X-ICM feature tables. |
+Only `scripts/verify_rerank_checkpoint_static.py` remains in the probe helper
+folder. Older descriptor-cache builders, prompt renderers, Robopoint projection
+checks, closed-loop ablation collectors, and tuning utilities were removed from
+the active tree because the current method gets its descriptors and final prompt
+through the X-ICM rerank code path above.
 
 ## Ignored Local Work
 
