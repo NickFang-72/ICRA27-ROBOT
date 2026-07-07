@@ -37,6 +37,14 @@ f.close()
 
 AUGMENTED_REVIEW_CACHE = None
 AUGMENTED_DEMO_STEPS_CACHE = {}
+AUGMENTED_DEMO_PHASE_CACHE = {}
+
+RETRIEVAL_RERANKING_ALIASES = {
+    "retrieval_reranking",
+    "retrieval-reranking",
+    "rerank_top50",
+    "rerank-top50",
+}
 
 GEOMETRY_FIELDS = [
     "action_primitive",
@@ -49,6 +57,7 @@ GEOMETRY_FIELDS = [
 ]
 
 CONTACT_HINT_FIELDS = [
+    "source_model",
     "contact_mode",
     "source_view",
     "target_object",
@@ -56,6 +65,8 @@ CONTACT_HINT_FIELDS = [
     "points_2d_normalized",
     "contact_region_text",
     "candidate_contact_coordinates",
+    "role_labeled_points",
+    "llm_contact_hint_text",
     "use_as",
 ]
 
@@ -111,6 +122,24 @@ PROFILE_FIELD_WEIGHTS = {
     "transfer_caution": 0.02,
 }
 
+PHASE_FIELDS = [
+    "primitive",
+    "phase_goal",
+    "contact_state",
+    "motion_axis",
+    "target_relation",
+    "stop_condition",
+]
+
+PHASE_FIELD_WEIGHTS = {
+    "primitive": 0.36,
+    "phase_goal": 0.18,
+    "contact_state": 0.16,
+    "motion_axis": 0.12,
+    "target_relation": 0.12,
+    "stop_condition": 0.06,
+}
+
 V3_CONTACT_COMPATIBILITY = {
     "hole_over_vertical_stand": {
         "ring_to_peg_insertion": 1.00,
@@ -139,6 +168,13 @@ V3_CONTACT_COMPATIBILITY = {
         "surface_slide_to_target": 0.65,
         "remove_from_support_surface": 0.35,
     },
+    "guided_ring_slide": {
+        "tool_drag_to_target": 0.80,
+        "surface_slide_to_target": 0.70,
+        "linear_handle_pull": 0.55,
+        "button_press": 0.05,
+        "button_or_switch_press": 0.05,
+    },
 }
 
 V3_FAMILY_GROUPS = [
@@ -163,6 +199,12 @@ V3_FAMILY_GROUPS = [
         "tool_drag_to_target",
         "sweep_into_receptacle",
         "surface_slide_to_target",
+    },
+    {
+        "guided_ring_slide",
+        "tool_drag_to_target",
+        "surface_slide_to_target",
+        "linear_handle_pull",
     },
     {
         "linear_pull_from_slot",
@@ -411,6 +453,24 @@ PLAN_FAMILY_COMPATIBILITY = {
             "screw_closure",
             "button_press",
             "button_or_switch_press",
+        },
+    },
+    "guided_ring_slide": {
+        "near": {"tool_drag_to_target", "surface_slide_to_target", "linear_handle_pull"},
+        "weak": {"deformable_drag_straighten", "pull_open_hinge"},
+        "blocked": {
+            "nested_object_stacking",
+            "rigid_object_stacking",
+            "object_to_holder_placement",
+            "object_to_rack_placement",
+            "object_into_open_receptacle",
+            "shape_profile_insertion",
+            "ring_to_peg_insertion",
+            "threaded_socket_insertion",
+            "screw_closure",
+            "button_press",
+            "button_or_switch_press",
+            "knob_or_handle_rotation",
         },
     },
     "knob_or_handle_rotation": {
@@ -833,14 +893,14 @@ TASK_PROFILE_OVERRIDES = {
         "transfer_caution": "prefer_turn_tap_over_push_button",
     },
     "beat_the_buzz": {
-        "interaction_family": "button_or_switch_press",
-        "motion_sequence": "move_to_buzzer_button_press_release",
-        "contact_strategy": "direct_surface_press",
-        "target_relation": "button_top_pressed",
-        "axis_constraint": "surface_normal_press_axis",
-        "articulation_model": "button_travel",
-        "precision_driver": "button_top_center",
-        "transfer_caution": "prefer_push_buttons_examples",
+        "interaction_family": "guided_ring_slide",
+        "motion_sequence": "grasp_wand_or_ring_slide_along_pole_to_goal_end_release",
+        "contact_strategy": "grasp_wand_or_ring_without_touching_middle_pole",
+        "target_relation": "wand_or_ring_reaches_right_end_sensor_without_middle_contact",
+        "axis_constraint": "guided_motion_along_pole_axis",
+        "articulation_model": "rigid_free_motion_with_collision_avoidance_constraint",
+        "precision_driver": "maintain_clearance_from_middle_pole_while_moving_to_end",
+        "transfer_caution": "not_a_button_press_task; avoid push_buttons analogies",
     },
     "water_plants": {
         "interaction_family": "pour_to_target",
@@ -946,8 +1006,8 @@ UNSEEN_DESCRIPTOR_RULES = {
         "affordance": {"grasp_affordance": "knob_grasp", "contact_affordance": "rotate_part", "motion_affordance": "rotate", "containment_affordance": "none", "articulation_affordance": "screw_twist", "required_contact_region": "oven_knob", "preferred_contact_points": [], "precision_requirement": "medium", "failure_sensitive_property": "wrong_axis"},
     },
     "beat_the_buzz": {
-        "geometry": {"manipulated_object": "buzzer", "key_features": ["buzzer", "button", "round", "small", "raised_surface"], "part_geometry": ["button"], "opening_geometry": "none", "axis_geometry": "none", "clearance_geometry": "open_path", "task_relevant_geometric_cues": ["button_top"]},
-        "affordance": {"grasp_affordance": "none", "contact_affordance": "push_surface", "motion_affordance": "push", "containment_affordance": "none", "articulation_affordance": "none", "required_contact_region": "button_top", "preferred_contact_points": [], "precision_requirement": "high", "failure_sensitive_property": "wrong_button"},
+        "geometry": {"manipulated_object": "wand_ring_and_pole", "key_features": ["wand", "ring", "pole", "right_end_sensor", "middle_contact_failure_region", "clearance_sensitive"], "part_geometry": ["wand_or_ring", "pole", "pole_head_or_goal_end"], "opening_geometry": "none", "axis_geometry": "along_pole", "clearance_geometry": "avoid_middle_pole_contact", "task_relevant_geometric_cues": ["wand_or_ring", "pole_axis", "right_end_goal"]},
+        "affordance": {"grasp_affordance": "grasp_wand_or_ring", "contact_affordance": "guided_slide_without_collision", "motion_affordance": "drag", "containment_affordance": "none", "articulation_affordance": "none", "required_contact_region": "wand_or_ring_body", "preferred_contact_points": [], "precision_requirement": "high", "failure_sensitive_property": "touching_middle_pole_or_wrong_goal_end"},
     },
     "water_plants": {
         "geometry": {"manipulated_object": "watering_can_and_plant", "key_features": ["watering_can", "handle", "spout", "plant", "pour", "target_region"], "part_geometry": ["handle", "spout", "plant"], "opening_geometry": "spout", "axis_geometry": "tilt_axis", "clearance_geometry": "open_path", "task_relevant_geometric_cues": ["spout_direction", "plant_target"]},
@@ -961,17 +1021,23 @@ UNSEEN_DESCRIPTOR_RULES = {
 
 
 def _is_augmented_ranking(ranking_metric):
-    return "geo_aff" in ranking_metric or ".geo" in ranking_metric or ".aff" in ranking_metric
+    return (
+        "geo_aff" in ranking_metric
+        or ".geo" in ranking_metric
+        or ".aff" in ranking_metric
+        or _is_retrieval_reranking_metric(ranking_metric)
+        or _is_phase_ranking(ranking_metric)
+    )
 
 
 def _include_geometry(ranking_metric):
-    return "geo_aff" in ranking_metric or ".geo" in ranking_metric
+    return "geo_aff" in ranking_metric or ".geo" in ranking_metric or _is_retrieval_reranking_metric(ranking_metric) or _is_phase_ranking(ranking_metric)
 
 
 def _include_affordance(ranking_metric):
     # Clean v1 restarts geometry as the only retrieval descriptor. RoboPoint is
     # contact-hint evidence for the final prompt after validation, not S_aff.
-    return ".aff" in ranking_metric and "geo_aff" not in ranking_metric
+    return (".aff" in ranking_metric and "geo_aff" not in ranking_metric) or _is_phase_ranking(ranking_metric)
 
 
 def _is_v2_ranking(ranking_metric):
@@ -990,6 +1056,29 @@ def _is_plan_ranking(ranking_metric):
     return "geo_plan" in ranking_metric or ".plan" in ranking_metric
 
 
+def _normalized_metric_tokens(ranking_metric):
+    return {
+        token
+        for token in re.split(r"[^a-z0-9]+", str(ranking_metric).strip().lower())
+        if token
+    }
+
+
+def _is_retrieval_reranking_metric(ranking_metric):
+    normalized = str(ranking_metric).strip().lower().replace("-", "_")
+    tokens = _normalized_metric_tokens(normalized)
+    return any(alias.replace("-", "_") in normalized for alias in RETRIEVAL_RERANKING_ALIASES) or {
+        "retrieval",
+        "reranking",
+    }.issubset(tokens)
+
+
+def _is_phase_ranking(ranking_metric):
+    normalized = str(ranking_metric).strip().lower().replace("-", "_")
+    tokens = _normalized_metric_tokens(normalized)
+    return "phase" in tokens or "phases" in tokens or "action_chain" in normalized or "actionchain" in normalized
+
+
 def _augmented_weights(ranking_metric):
     if all(os.environ.get(name) is not None for name in ["XICM_GA_ALPHA", "XICM_GA_BETA", "XICM_GA_GAMMA"]):
         # Contact hints/points are prompt-only. Keep the gamma env var accepted
@@ -997,6 +1086,10 @@ def _augmented_weights(ranking_metric):
         return float(os.environ["XICM_GA_ALPHA"]), float(os.environ["XICM_GA_BETA"]), 0.0
     if _is_plan_ranking(ranking_metric):
         return 0.72, 0.03, 0.0
+    if _is_phase_ranking(ranking_metric):
+        return 0.45, 0.10, 0.0
+    if _is_retrieval_reranking_metric(ranking_metric):
+        return 0.45, 0.10, 0.0
     if _is_v4_ranking(ranking_metric):
         return 0.70, 0.05, 0.0
     if _is_v3_ranking(ranking_metric):
@@ -1018,6 +1111,16 @@ def _profile_weights(ranking_metric):
             float(os.environ.get("XICM_GA_DELTA", "0.25")),
             float(os.environ.get("XICM_GA_PENALTY", "0.55")),
         )
+    if _is_phase_ranking(ranking_metric):
+        return (
+            float(os.environ.get("XICM_GA_DELTA", "0.45")),
+            float(os.environ.get("XICM_GA_PENALTY", "0.60")),
+        )
+    if _is_retrieval_reranking_metric(ranking_metric):
+        return (
+            float(os.environ.get("XICM_GA_DELTA", "0.45")),
+            float(os.environ.get("XICM_GA_PENALTY", "0.60")),
+        )
     if _is_v4_ranking(ranking_metric):
         return (
             float(os.environ.get("XICM_GA_DELTA", "0.40")),
@@ -1034,10 +1137,47 @@ def _profile_weights(ranking_metric):
     )
 
 
+def _rerank_candidate_count(total_count, top_k):
+    raw_value = os.environ.get("XICM_GA_RERANK_CANDIDATES", "50").strip().lower()
+    if raw_value in {"", "all", "none", "off", "0", "-1"}:
+        return total_count
+    try:
+        requested = int(raw_value)
+    except ValueError:
+        requested = 50
+    requested = max(int(top_k), requested)
+    return max(0, min(int(total_count), requested))
+
+
 def _task_episode_from_path(path):
     task = path.split("/")[-4]
     episode = int(path.split("/")[-1].replace("episode", "", 1))
     return task, episode
+
+
+def _dynamic_shortlist_candidates(similarity, all_demo_paths, review_cache, requested_count):
+    if requested_count <= 0:
+        return []
+    sorted_indices = np.argsort(similarity)[::-1]
+    candidates = []
+    for dynamic_rank, idx in enumerate(sorted_indices, start=1):
+        task, episode_id = _task_episode_from_path(all_demo_paths[idx])
+        row = review_cache.get((task, episode_id))
+        if row is None:
+            continue
+        candidates.append(
+            {
+                "index": int(idx),
+                "dynamic_rank": dynamic_rank,
+                "task": task,
+                "episode_id": episode_id,
+                "row": row,
+                "dynamic_score_raw": float(similarity[idx]),
+            }
+        )
+        if len(candidates) >= requested_count:
+            break
+    return candidates
 
 
 def _select_diverse_ranked_items(ranked, top_k):
@@ -1635,6 +1775,363 @@ def _goal_state_descriptor(task_key, geometry, affordance, profile=None, raw_goa
     }
 
 
+def _phase_record(phase_id, primitive, phase_goal, contact_state, motion_axis, target_relation, stop_condition, forbidden_after=None):
+    return {
+        "phase_id": int(phase_id),
+        "primitive": primitive,
+        "phase_goal": phase_goal,
+        "contact_state": contact_state,
+        "motion_axis": motion_axis,
+        "target_relation": target_relation,
+        "stop_condition": stop_condition,
+        "forbidden_after": forbidden_after or [],
+    }
+
+
+def _build_action_chain(task_key, geometry, affordance, profile=None, goal_state=None):
+    geometry = _canonical_geometry(task_key, geometry, affordance)
+    profile = profile or _interaction_profile(task_key, geometry, affordance)
+    goal_state = goal_state or _goal_state_descriptor(task_key, geometry, affordance, profile, use_as="query_goal_state")
+    family = _family_name(profile)
+    action = _first_label(geometry.get("action_primitive"), "unknown")
+    axis = _first_label(profile.get("axis_constraint") or geometry.get("motion_axis"), "unknown")
+    relation = _first_label(goal_state.get("required_final_relation") or profile.get("target_relation"), "unknown")
+    contact = _first_label(profile.get("contact_strategy") or geometry.get("contact_region"), "unknown")
+
+    def rec(idx, primitive, goal, contact_state, motion_axis=None, stop=None, forbidden=None):
+        return _phase_record(
+            idx,
+            primitive,
+            goal,
+            contact_state,
+            motion_axis or axis,
+            relation,
+            stop or goal_state.get("release_or_stop_condition") or relation,
+            forbidden_after=forbidden,
+        )
+
+    if family in {"button_press", "button_or_switch_press"}:
+        return [
+            rec(0, "approach", f"move end effector to {contact}", "no_object_in_gripper", "toward_contact", "contact point reached"),
+            rec(1, "press", "press the active button/switch", "surface_contact", "surface_normal", "switch/button state changes", ["repeat_approach"]),
+            rec(2, "release_or_retract", "stop pressing and retract slightly", "no_object_in_gripper", "away_from_contact", "button press completed", ["repeat_press"]),
+        ]
+    if family in {"knob_or_handle_rotation", "screw_closure"}:
+        return [
+            rec(0, "approach", f"move to rotary contact region {contact}", "no_object_in_gripper", "toward_contact", "knob/handle reached"),
+            rec(1, "grasp_or_contact", "establish contact on the rotary part", "contact_or_grasp_established", "toward_contact", "stable rotary contact"),
+            rec(2, "rotate", "rotate about the task axis until the target state is reached", "contact_or_grasp_held", "rotational", "rotary state changed", ["repeat_grasp_or_contact"]),
+            rec(3, "release_or_stop", "stop rotation and release/retract", "no_object_in_gripper", "away_from_contact", "rotation complete", ["repeat_rotate"]),
+        ]
+    if family in {"linear_pull_from_slot", "linear_handle_pull", "remove_flat_object_from_rack"}:
+        return [
+            rec(0, "approach", f"move to grasp/contact region {contact}", "no_object_in_gripper", "toward_contact", "pull contact reached"),
+            rec(1, "grasp", "close gripper on the pullable part", "object_or_handle_in_gripper", "toward_contact", "object/handle held"),
+            rec(2, "pull_or_extract", "pull along the constrained axis until clear/open", "object_or_handle_held", "linear_pull_axis", "target separated or container opened", ["repeat_grasp"]),
+            rec(3, "release_or_stop", "stop/release after extraction or opening succeeds", "released_or_stationary", "away_from_constraint", "pull/extract complete", ["repeat_pull_or_extract"]),
+        ]
+    if family in {"hinged_door_close", "hinged_panel_close"}:
+        return [
+            rec(0, "approach", f"move to hinged surface/contact region {contact}", "no_object_in_gripper", "toward_contact", "door/panel contact reached"),
+            rec(1, "push_or_rotate_hinge", "push the moving panel along its hinge path", "surface_contact", "hinge_arc", "panel reaches closed state", ["repeat_approach"]),
+            rec(2, "release_or_retract", "stop pushing and retract from the panel", "no_object_in_gripper", "away_from_contact", "hinge close complete", ["repeat_push_or_rotate_hinge"]),
+        ]
+    if family == "hinged_lid_open":
+        return [
+            rec(0, "approach", f"move to lid handle/contact region {contact}", "no_object_in_gripper", "toward_contact", "handle/contact reached"),
+            rec(1, "grasp", "grasp the lid handle or edge", "handle_in_gripper", "toward_contact", "lid handle held"),
+            rec(2, "pull_open_hinge", "pull/lift along the hinge arc", "handle_held", "hinge_arc", "lid opens", ["repeat_grasp"]),
+            rec(3, "release_or_stop", "stop when the lid is open", "released_or_stationary", "away_from_contact", "open hinge complete", ["repeat_pull_open_hinge"]),
+        ]
+    if family in {"tool_scoop_under_object", "tool_drag_to_target", "sweep_into_receptacle"}:
+        return [
+            rec(0, "approach", f"move to tool/contact region {contact}", "no_object_in_gripper", "toward_tool_or_contact", "tool/contact reached"),
+            rec(1, "grasp_or_contact_tool", "hold the tool or establish sweeping contact", "tool_contact_or_held", "toward_contact", "tool/contact ready"),
+            rec(2, "slide_or_sweep", "slide/sweep along the surface toward the target relation", "tool_contact_maintained", "planar_sweep_axis", "object/material reaches target", ["repeat_grasp_or_contact_tool"]),
+            rec(3, "lift_or_stop", "lift/stop after the sweep or scoop relation is achieved", "tool_contact_complete", "vertical_or_retract", "tool phase complete", ["repeat_slide_or_sweep"]),
+        ]
+    if family == "deformable_drag_straighten":
+        return [
+            rec(0, "approach", f"move to deformable contact region {contact}", "no_object_in_gripper", "toward_contact", "rope contact reached"),
+            rec(1, "grasp", "pinch the selected rope endpoint/body", "deformable_object_in_gripper", "toward_contact", "rope held"),
+            rec(2, "pull_or_drag", "drag to reduce curvature and straighten the rope", "deformable_object_held", "planar_drag_axis", "rope straighter", ["repeat_grasp"]),
+            rec(3, "release_or_stop", "release once the rope is straight enough", "released", "away_from_contact", "deformable phase complete", ["repeat_pull_or_drag"]),
+        ]
+    if family == "guided_ring_slide":
+        return [
+            rec(0, "approach", f"move open gripper to the wand/ring contact region {contact}", "no_object_in_gripper", "toward_wand_or_ring", "wand/ring contact reached"),
+            rec(1, "grasp", "grasp the wand/ring body without contacting the middle pole", "wand_or_ring_in_gripper", "toward_contact", "wand/ring held"),
+            rec(2, "pull_or_drag", "slide the held wand/ring along the pole axis toward the right/end goal while maintaining clearance", "wand_or_ring_held", "guided_motion_along_pole_axis", "wand/ring reaches goal end without middle contact", ["repeat_grasp"]),
+            rec(3, "release_or_stop", "release/stop after the wand/ring reaches the goal end", "released_or_stationary", "away_from_pole", "guided slide complete", ["repeat_pull_or_drag"]),
+        ]
+    if family == "lift_lid_from_container":
+        return [
+            rec(0, "approach", f"move to lid knob/contact region {contact}", "no_object_in_gripper", "toward_contact", "knob/contact reached"),
+            rec(1, "grasp", "grasp the lid knob/body", "lid_in_gripper", "toward_contact", "lid held"),
+            rec(2, "lift", "lift vertically until the lid clears the rim", "lid_held", "vertical", "lid separated from container", ["repeat_grasp"]),
+            rec(3, "release_or_stop", "stop after the lid is clear", "released_or_stationary", "away_from_container", "lid removal complete", ["repeat_lift"]),
+        ]
+    if family == "pour_to_target":
+        return [
+            rec(0, "approach", f"move to handle/contact region {contact}", "no_object_in_gripper", "toward_contact", "handle reached"),
+            rec(1, "grasp", "grasp the pouring object handle/body", "container_in_gripper", "toward_contact", "container held"),
+            rec(2, "move_or_align", "move spout over the target region", "container_held", "free_motion", "spout aligned to target", ["repeat_grasp"]),
+            rec(3, "tilt_or_pour", "tilt about the pouring axis toward the target", "container_held", "tilt_axis", "target watered/poured", ["repeat_move_or_align"]),
+            rec(4, "untilt_or_stop", "stop pouring and stabilize/retract", "container_held_or_released", "reverse_tilt_or_retract", "pour complete", ["repeat_tilt_or_pour"]),
+        ]
+
+    if action in {"press", "push"} and family not in {"rigid_object_stacking", "nested_object_stacking"}:
+        return [
+            rec(0, "approach", f"move to contact region {contact}", "no_object_in_gripper", "toward_contact", "contact reached"),
+            rec(1, action, f"perform {action} motion toward the goal relation", "surface_contact", axis, relation, ["repeat_approach"]),
+            rec(2, "release_or_stop", "stop/retract after the goal relation is reached", "no_object_in_gripper", "away_from_contact", relation, [f"repeat_{action}"]),
+        ]
+
+    return [
+        rec(0, "approach", f"move open gripper to contact region {contact}", "no_object_in_gripper", "toward_contact", "grasp/contact pose reached"),
+        rec(1, "grasp", "close gripper on the manipulated object", "object_in_gripper", "toward_contact", "object held"),
+        rec(2, "move_or_align", "move/align the held object toward the goal relation", "object_held", axis, relation, ["repeat_grasp"]),
+        rec(3, "place_or_release", "lower/place/release only after alignment succeeds", "released_at_goal", axis, relation, ["repeat_move_or_align", "repeat_grasp"]),
+    ]
+
+
+def _phase_for_index(action_chain, current_phase_index):
+    if not action_chain:
+        return _phase_record(0, "perform_task", "complete the task", "unknown", "unknown", "unknown", "task complete")
+    try:
+        index = int(current_phase_index)
+    except (TypeError, ValueError):
+        index = 0
+    index = max(0, index)
+    if index >= len(action_chain):
+        last_phase = action_chain[-1]
+        finished_primitives = [phase.get("primitive", "unknown") for phase in action_chain]
+        return _phase_record(
+            len(action_chain),
+            "finish_or_retract",
+            "all planned phases are complete; emit one small stabilizing, release, or retract action only",
+            last_phase.get("contact_state", "task_complete_or_stabilizing"),
+            "away_from_contact_or_hold_still",
+            last_phase.get("target_relation", "task goal should already be satisfied"),
+            "finish without repeating any completed manipulation phase",
+            [f"repeat_{primitive}" for primitive in finished_primitives],
+        )
+    return action_chain[index]
+
+
+def _format_action_chain(action_chain):
+    lines = ["Action chain:"]
+    for phase in action_chain:
+        lines.append(
+            (
+                f"{phase['phase_id']}. primitive={phase['primitive']}; "
+                f"goal={phase['phase_goal']}; contact_state={phase['contact_state']}; "
+                f"motion_axis={phase['motion_axis']}; stop={phase['stop_condition']}"
+            )
+        )
+    return "\n".join(lines)
+
+
+def _phase_contact_relevance(point, phase):
+    role = str(point.get("role", "")).lower()
+    primitive = str(phase.get("primitive", "")).lower()
+    if primitive in {"approach", "grasp", "grasp_or_contact", "grasp_or_contact_tool"}:
+        return role in {"manipulated_object_contact", "tool_working_edge", "constraint_reference", "secondary_object_to_move"}
+    if primitive in {"move_or_align", "place_or_release", "insert", "lower", "lift_or_stop"}:
+        return role in {"goal_region", "constraint_reference", "manipulated_object_contact", "tool_working_edge"}
+    if primitive in {"slide_or_sweep", "pull_or_drag", "pull_or_extract", "push", "press", "push_or_rotate_hinge", "pull_open_hinge", "rotate", "tilt_or_pour"}:
+        return role in {"manipulated_object_contact", "tool_working_edge", "secondary_object_to_move", "constraint_reference", "goal_region"}
+    return True
+
+
+def _phase_gripper_guidance(phase):
+    primitive = str(phase.get("primitive", "")).lower()
+    contact_state = str(phase.get("contact_state", "")).lower()
+    guidance = [
+        "- Gripper convention: 1=open, 0=closed.",
+    ]
+    if primitive == "approach":
+        guidance.append("- Approach phase: keep the gripper open; the final action for this phase should end with gripper=1.")
+    elif primitive in {"grasp", "grasp_or_contact", "grasp_or_contact_tool"}:
+        guidance.append("- Grasp/contact phase: close on the manipulated object/tool/contact part; the final action for this phase must end with gripper=0 unless this is explicitly surface_contact only.")
+    elif primitive in {"place_or_release", "release_or_stop", "release_or_retract"}:
+        guidance.append("- Release/stop phase: open or finish releasing only after the target relation is reached; the final action should end with gripper=1.")
+    elif primitive == "finish_or_retract":
+        guidance.append("- Finish phase: do not redo approach, grasp, sweep, insert, press, pull, rotate, or place. Emit at most one small stabilize/retract action.")
+    elif "held" in contact_state or "in_gripper" in contact_state:
+        guidance.append("- Held-object/tool motion phase: keep the object/tool held during motion; the final action should usually end with gripper=0.")
+    else:
+        guidance.append("- Surface-contact motion phase: choose gripper state from the current phase contact_state and retrieved phase timing; do not invent a grasp if the phase is push/press/slide-only.")
+    return guidance
+
+
+def _role_point_lookup(contact_hints):
+    lookup = {}
+    points = contact_hints.get("role_labeled_points") or []
+    if not isinstance(points, list):
+        return lookup
+    for point in points:
+        if not isinstance(point, dict):
+            continue
+        role = str(point.get("role", "")).lower()
+        if role and role not in lookup:
+            lookup[role] = point
+    return lookup
+
+
+def _point_voxel_text(point):
+    if not isinstance(point, dict):
+        return "unknown"
+    return (
+        f"{point.get('target_object', 'object')}/{point.get('target_part', 'part')} "
+        f"voxel={point.get('voxel_xyz', 'unknown')}"
+    )
+
+
+def _phase_action_guidance(phase, query_profile, contact_hints):
+    primitive = str(phase.get("primitive", "")).lower()
+    contact_state = str(phase.get("contact_state", "")).lower()
+    family = _family_name(query_profile)
+    role_points = _role_point_lookup(contact_hints)
+    manipulated = role_points.get("manipulated_object_contact")
+    tool_edge = role_points.get("tool_working_edge")
+    secondary = role_points.get("secondary_object_to_move")
+    goal = role_points.get("goal_region") or role_points.get("constraint_reference")
+
+    lines = [
+        "Phase action-chunk guidance:",
+        "- Output a short mini-trajectory for this phase, not just a label or one copied demo coordinate.",
+        "- Use retrieved seen phase examples for action rhythm and gripper timing, but compute coordinates from current c_j anchors and the current observation.",
+    ]
+    if manipulated:
+        lines.append(f"- manipulated_object_contact anchor: {_point_voxel_text(manipulated)}")
+    if tool_edge:
+        lines.append(f"- tool_working_edge anchor: {_point_voxel_text(tool_edge)}")
+    if secondary:
+        lines.append(f"- secondary_object_to_move anchor: {_point_voxel_text(secondary)}")
+    if goal:
+        lines.append(f"- goal/constraint anchor: {_point_voxel_text(goal)}")
+
+    if primitive == "approach":
+        lines.extend(
+            [
+                "- Expected chunk length: 1-2 actions.",
+                "- Move from the current gripper pose to a safe hover above/near the manipulated/contact anchor with the gripper open. Do not touch or push the object during approach.",
+            ]
+        )
+    elif primitive in {"grasp", "grasp_or_contact", "grasp_or_contact_tool"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 2 actions when grasping: descend/settle at the manipulated/contact anchor with gripper open, then close at the same anchor.",
+                "- End at the manipulated/contact anchor with gripper closed when the phase is a grasp/tool hold.",
+            ]
+        )
+    elif primitive in {"slide_or_sweep", "pull_or_drag", "push", "press", "pull_or_extract", "push_or_rotate_hinge", "pull_open_hinge"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 2-5 actions.",
+                "- Make real spatial progress along the phase motion axis; do not emit a tiny hold action.",
+                "- For slide/sweep/scoop, keep the tool/contact low near the table or object surface until the next lift/release phase.",
+                "- If a secondary_object_to_move or goal anchor is present, move laterally toward and slightly through/over that anchor so contact can transfer force.",
+                "- If a tool_working_edge anchor is present, treat it as the blade/contact edge and preserve the handle-to-edge offset while moving the blade toward/under the secondary object.",
+            ]
+        )
+        if primitive == "push_or_rotate_hinge":
+            lines.append("- For hinge closing, keep contact on the moving panel/seat/door and push along the hinge arc; do not stop at the first contact point.")
+        if primitive in {"pull_or_drag", "pull_or_extract"}:
+            lines.append("- For extraction, move away from the constraint/socket/rack along the constrained pull axis; do not lift straight up unless the task descriptor says vertical.")
+    elif primitive in {"rotate", "tilt_or_pour", "untilt_or_stop"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 2-3 actions.",
+                "- Keep the gripper/contact point at the rotary or tilt anchor while changing orientation around the required axis.",
+                "- Do not translate far away from the knob/handle/contact anchor during the rotation phase.",
+            ]
+        )
+    elif primitive in {"lift", "lift_or_stop", "pull_open_hinge"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 2-3 actions.",
+                "- If the object/tool should be held, keep gripper closed and raise z clearly above the contact/object height before stopping.",
+                "- For scoop/lift, z should increase substantially from the surface contact height; do not merely hold at the same z.",
+            ]
+        )
+        if family == "tool_scoop_under_object":
+            lines.append(
+                "- For tool-scoop lift, continue from the final slide/sweep pose and lift the held tool upward without jumping to a new lateral coordinate."
+            )
+    elif primitive in {"move_or_align", "insert", "lower"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 2-4 actions.",
+                "- Move from the current held/contact pose toward the goal/constraint anchor, then align/lower along the required axis.",
+            ]
+        )
+        if family == "pour_to_target" and tool_edge and goal:
+            lines.append(
+                "- For pouring, tool_working_edge is the spout/head. Move the held handle/body so that this spout/head, not necessarily the gripper center, is over the goal/plant anchor before tilting."
+            )
+    elif primitive in {"place_or_release", "release_or_stop", "release_or_retract", "finish_or_retract"}:
+        lines.extend(
+            [
+                "- Expected chunk length: 1 action for finish/retract, or 2 actions for release: lower/stabilize closed at the goal, then open at the same goal.",
+                "- Do not repeat completed approach/grasp/transport actions. Release or stabilize only if the target relation is already reached.",
+            ]
+        )
+    else:
+        lines.append("- Expected chunk length: 1-3 actions, enough to complete only the current phase.")
+
+    if family == "tool_scoop_under_object":
+        lines.extend(
+            [
+                "- Tool-scoop rule: grasp/hold the spatula handle, slide the blade low toward the cube, pass under the cube, then lift in the lift phase.",
+                "- For slide_or_sweep in this family, keep z near the blade/cube surface and move y/x toward the cube anchor; save the high z motion for lift_or_stop.",
+                "- For lift_or_stop in this family, keep gripper closed and raise the spatula/cube above the table with a clearly larger z value.",
+            ]
+        )
+    if family == "guided_ring_slide":
+        lines.extend(
+            [
+                "- Guided-ring-slide rule: this is not a button press. Grasp/hold the wand or ring, then move it along the pole axis toward the goal/end anchor while avoiding the middle pole/contact constraint.",
+                "- For pull_or_drag in this family, keep gripper closed, keep the z height close to the wand/ring height, and make lateral progress along the pole instead of pressing downward.",
+                "- If a constraint_reference anchor is present, treat it as a region to keep clearance from, not as the target to touch.",
+            ]
+        )
+    indicates_held = (
+        ("held" in contact_state or "in_gripper" in contact_state)
+        and not contact_state.startswith("no_")
+        and "no_object" not in contact_state
+    )
+    if indicates_held:
+        lines.append("- Because contact_state indicates something is held, keep gripper=0 through the chunk unless this is explicitly a release phase.")
+    return lines
+
+
+def _format_phase_query_contact_hints(contact_hints, phase):
+    points = contact_hints.get("role_labeled_points") or []
+    if not isinstance(points, list) or not points:
+        return _format_compact_query_contact_hints(contact_hints)
+    relevant = [point for point in points if isinstance(point, dict) and _phase_contact_relevance(point, phase)]
+    if not relevant:
+        relevant = [point for point in points if isinstance(point, dict)]
+    lines = [
+        "Relevant query contact/target anchors c_j for the current phase:",
+        f"- current_phase: {phase.get('primitive', 'unknown')}",
+        f"- contact_mode: {_compact_descriptor_value(contact_hints, 'contact_mode')}",
+        "- role_labeled_points:",
+    ]
+    for point in relevant:
+        lines.append(
+            (
+                f"{point.get('index', '?')}. role={point.get('role', 'unknown')} "
+                f"({point.get('role_label', 'point')}); object={point.get('target_object', 'unknown')}; "
+                f"part={point.get('target_part', 'unknown')}; voxel_xyz={point.get('voxel_xyz', 'unknown')}; "
+                f"world_xyz={point.get('world_xyz', 'unknown')}; phase_use={point.get('role', 'point')} anchor for {phase.get('primitive', 'current phase')}"
+            )
+        )
+    return "\n".join(lines)
+
+
 def _profile_value_similarity(seen_value, query_value):
     seen_tokens = _profile_tokens(seen_value)
     query_tokens = _profile_tokens(query_value)
@@ -1795,6 +2292,12 @@ def _profile_conflict_penalty(seen_profile, query_profile):
         if not _profile_has(seen_profile, "button", "press", "switch"):
             penalty += 0.30
 
+    if _profile_has(query_profile, "guided_ring_slide", "maintain_clearance_from_middle_pole"):
+        if _profile_has(seen_profile, "button", "press", "switch"):
+            penalty += 0.45
+        if not _profile_has(seen_profile, "slide", "drag", "pull", "tool", "linear"):
+            penalty += 0.15
+
     if _profile_has(query_profile, "knob_or_handle_rotation"):
         if not _profile_has(seen_profile, "rotate", "rotation", "rotary", "twist"):
             penalty += 0.30
@@ -1876,6 +2379,10 @@ def _write_retrieval_audit(ranking_metric, query_task, query_profile, ranked):
                 "score": item.get("score"),
                 "raw_score": item.get("raw_score"),
                 "attention_bias": item.get("attention_bias"),
+                "dynamic_rank": item.get("dynamic_rank"),
+                "dynamic_score_raw": item.get("dynamic_score_raw"),
+                "rerank_pool_size": item.get("rerank_pool_size"),
+                "rerank_pool_requested": item.get("rerank_pool_requested"),
                 "s_dyn": item.get("s_dyn"),
                 "s_geo": item.get("s_geo"),
                 "s_profile": item.get("s_profile"),
@@ -1891,6 +2398,8 @@ def _write_retrieval_audit(ranking_metric, query_task, query_profile, ranked):
         "ranking_metric": ranking_metric,
         "query_task": query_task,
         "query_family": _family_name(query_profile),
+        "rerank_pool_size": ranked[0].get("rerank_pool_size") if ranked else 0,
+        "rerank_pool_requested": ranked[0].get("rerank_pool_requested") if ranked else 0,
         "tier_counts": tier_counts,
         "seen_family_counts": family_counts,
         "top": top,
@@ -1919,11 +2428,1050 @@ def _contact_mode_from_affordance(affordance):
     return "region_hint"
 
 
+ORACLE_CONTACT_BACKGROUND_TOKENS = {
+    "panda",
+    "link",
+    "gripper",
+    "finger",
+    "floor",
+    "table",
+    "workspace",
+    "boundary",
+    "spawn",
+    "wall",
+    "resizablefloor",
+    "diningtable",
+    "visibleelement",
+    "visible",
+}
+
+ORACLE_CONTACT_ROLE_RULES = {
+    "basketball_in_hoop": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "basketball",
+            "target_part": "ball_body",
+            "keywords": [["ball"], ["basketball"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "hoop",
+            "target_part": "hoop_ring_center",
+            "keywords": [["basket_ball_hoop"], ["hoop"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "close_fridge": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "fridge_door",
+            "target_part": "door_panel_or_handle",
+            "keywords": [["door_bottom_visual"], ["door_top_visual"], ["door"]],
+            "contact_mode": "push_or_pull_contact",
+        }
+    ],
+    "close_microwave": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "microwave_door",
+            "target_part": "door_panel_or_handle",
+            "keywords": [["microwave_door"], ["door"]],
+            "contact_mode": "push_or_pull_contact",
+        }
+    ],
+    "phone_on_base": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "phone",
+            "target_part": "phone_body",
+            "keywords": [["phone_visual"], ["phone"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "phone_base",
+            "target_part": "base_surface",
+            "keywords": [["phone_case_visual"], ["phone_case"], ["base"], ["case"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "turn_oven_on": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "oven_knob",
+            "target_part": "knob_face",
+            "keywords": [["oven_knob_8"], ["oven_knob"]],
+            "contact_mode": "twist",
+            "allow_multiple": True,
+            "max_matches": 5,
+        }
+    ],
+    "water_plants": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "watering_can",
+            "target_part": "waterer_body_or_handle",
+            "keywords": [["waterer_visual"], ["watering_can"], ["waterer"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "plant",
+            "target_part": "plant_top_or_pot",
+            "keywords": [["plant_visual"], ["plant"]],
+            "contact_mode": "pour_target",
+        },
+    ],
+    "lamp_on": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "lamp_button",
+            "target_part": "button_top",
+            "keywords": [["push_button_target"], ["target_button_top_plate"], ["target_button_topPlate"], ["button"]],
+            "contact_mode": "press_point",
+            "allow_multiple": True,
+            "max_matches": 2,
+        }
+    ],
+    "lamp_off": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "lamp_button",
+            "target_part": "button_top",
+            "keywords": [["push_button_target"], ["target_button_top_plate"], ["target_button_topPlate"], ["button"]],
+            "contact_mode": "press_point",
+            "allow_multiple": True,
+            "max_matches": 2,
+        }
+    ],
+    "beat_the_buzz": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "wand_or_ring",
+            "target_part": "wand_or_ring_body",
+            "keywords": [["wand"], ["wand_visual"], ["wand_visual_sub"], ["pole_head"], ["pole head"], ["cuboid"], ["cube"]],
+            "contact_mode": "grasp_pair",
+            "allow_multiple": True,
+            "max_matches": 3,
+        },
+        {
+            "role": "goal_region",
+            "target_object": "right_end_or_goal_sensor",
+            "target_part": "pole_goal_end",
+            "keywords": [["right_sensor"], ["success"]],
+            "contact_mode": "guided_slide_goal",
+            "allow_multiple": True,
+            "max_matches": 1,
+        },
+        {
+            "role": "constraint_reference",
+            "target_object": "middle_pole",
+            "target_part": "avoid_contact_region",
+            "keywords": [["middle_sensor"]],
+            "contact_mode": "avoidance_constraint",
+            "allow_multiple": True,
+            "max_matches": 1,
+        }
+    ],
+    "put_books_on_bookshelf": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "book",
+            "target_part": "book_body",
+            "keywords": [["book0_visual"], ["book1_visual"], ["book2_visual"], ["book"]],
+            "contact_mode": "grasp_pair",
+            "allow_multiple": True,
+            "max_matches": 3,
+        },
+        {
+            "role": "goal_region",
+            "target_object": "bookshelf",
+            "target_part": "shelf_opening",
+            "keywords": [["bookshelf_visual"], ["bookshelf"], ["shelf"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "put_knife_on_chopping_board": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "knife",
+            "target_part": "knife_handle_or_body",
+            "keywords": [["knife_visual"], ["knife"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "chopping_board",
+            "target_part": "board_surface",
+            "keywords": [["chopping_board_visual"], ["chopping_board"], ["board"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "put_rubbish_in_bin": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "rubbish",
+            "target_part": "rubbish_body",
+            "keywords": [["rubbish_visual"], ["rubbish"], ["tomato"]],
+            "contact_mode": "grasp_pair",
+            "allow_multiple": True,
+            "max_matches": 3,
+        },
+        {
+            "role": "goal_region",
+            "target_object": "bin",
+            "target_part": "bin_opening",
+            "keywords": [["bin_visual"], ["bin"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "put_toilet_roll_on_stand": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "toilet_roll",
+            "target_part": "roll_body",
+            "keywords": [["toilet_roll_visual"], ["toilet_roll"], ["roll"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "stand",
+            "target_part": "holder_or_vertical_stand",
+            "keywords": [["holder_visual"], ["stand_visual"], ["stand_base"], ["holder"], ["stand"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "put_umbrella_in_umbrella_stand": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "umbrella",
+            "target_part": "umbrella_body_or_handle",
+            "keywords": [["umbrella_visual"], ["umbrella"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "umbrella_stand",
+            "target_part": "stand_opening",
+            "keywords": [["stand_visual"], ["stand"]],
+            "contact_mode": "goal_region",
+        },
+    ],
+    "scoop_with_spatula": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "spatula",
+            "target_part": "spatula_handle",
+            "keywords": [["spatula_visual"], ["spatula"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "secondary_object_to_move",
+            "target_object": "object_to_scoop",
+            "target_part": "object_body",
+            "keywords": [["cuboid"], ["cube"], ["block"]],
+            "contact_mode": "scoop_target",
+        },
+    ],
+    "take_lid_off_saucepan": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "saucepan_lid",
+            "target_part": "lid_knob_or_lid_body",
+            "keywords": [["saucepan_lid_visual"], ["lid"]],
+            "contact_mode": "grasp_pair",
+        }
+    ],
+    "take_plate_off_colored_dish_rack": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "plate",
+            "target_part": "plate_rim_or_body",
+            "keywords": [["plate_visual"], ["plate"]],
+            "contact_mode": "grasp_pair",
+        },
+        {
+            "role": "constraint_region",
+            "target_object": "dish_rack",
+            "target_part": "rack_slot_or_pillar",
+            "keywords": [["dish_rack"], ["pillar"], ["rack"]],
+            "contact_mode": "clearance_constraint",
+            "allow_multiple": True,
+            "max_matches": 3,
+        },
+    ],
+    "toilet_seat_down": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "toilet_seat",
+            "target_part": "seat_rim_or_panel",
+            "keywords": [["toilet_seat_up_seat"], ["seat"]],
+            "contact_mode": "push_or_pull_contact",
+        }
+    ],
+    "unplug_charger": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "charger_plug",
+            "target_part": "plug_or_charger_body",
+            "keywords": [["charger_visual"], ["plug"], ["charger"]],
+            "contact_mode": "grasp_pair",
+        }
+    ],
+    "close_laptop_lid": [
+        {
+            "role": "manipulated_object_contact",
+            "target_object": "laptop_lid",
+            "target_part": "lid_surface",
+            "keywords": [["lid_visual"], ["lid"]],
+            "contact_mode": "push_or_pull_contact",
+        },
+        {
+            "role": "goal_region",
+            "target_object": "laptop_base",
+            "target_part": "base_or_holder",
+            "keywords": [["base_visual"], ["laptop_holder"], ["base"]],
+            "contact_mode": "closing_target_region",
+        },
+    ],
+}
+
+ORACLE_CONTACT_STRICT_TASK_RULES = {
+    # These tasks have simulator-mask names that are more reliable than
+    # descriptor-expanded keywords. Descriptor fallbacks can otherwise leak
+    # goal/constraint masks into manipulated-object roles (e.g. plant as a
+    # watering-can handle) or static scene parts into actionable contacts.
+    "beat_the_buzz",
+    "turn_oven_on",
+    "water_plants",
+}
+
+
+def _oracle_contact_normalize_name(value):
+    value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+def _oracle_contact_tokens(value):
+    return {token for token in _oracle_contact_normalize_name(value).split("_") if token}
+
+
+def _oracle_contact_is_background(name):
+    return bool(_oracle_contact_tokens(name) & ORACLE_CONTACT_BACKGROUND_TOKENS)
+
+
+def _oracle_contact_keyword_score(name, keyword_groups):
+    normalized = _oracle_contact_normalize_name(name)
+    tokens = _oracle_contact_tokens(name)
+    best = 0
+    for group in keyword_groups or []:
+        group_score = 0
+        for keyword in group:
+            key = _oracle_contact_normalize_name(keyword)
+            key_tokens = _oracle_contact_tokens(key)
+            if key and key == normalized:
+                group_score += 10
+            elif key and key in normalized:
+                group_score += 3
+            elif key_tokens and key_tokens <= tokens:
+                group_score += 2
+            elif key_tokens & tokens:
+                group_score += 1
+        best = max(best, group_score)
+    return best
+
+
+def _oracle_contact_mask_areas(mask, mask_id_to_sim_name):
+    ids, counts = np.unique(mask, return_counts=True)
+    name_by_id = {}
+    for raw_id, raw_name in (mask_id_to_sim_name or {}).items():
+        try:
+            name_by_id[int(raw_id)] = str(raw_name)
+        except Exception:
+            continue
+    areas = {}
+    for mask_id, count in zip(ids.astype(int), counts.astype(int)):
+        name = name_by_id.get(int(mask_id))
+        if not name or _oracle_contact_is_background(name):
+            continue
+        areas[int(mask_id)] = {
+            "mask_id": int(mask_id),
+            "mask_name": name,
+            "area_pixels": int(count),
+        }
+    return areas
+
+
+ORACLE_CONTACT_DESCRIPTOR_STOPWORDS = {
+    "and",
+    "or",
+    "the",
+    "task",
+    "object",
+    "region",
+    "body",
+    "visual",
+    "current",
+    "query",
+    "unseen",
+    "unknown",
+    "none",
+    "free",
+    "motion",
+    "target",
+    "required",
+    "final",
+    "relation",
+    "state",
+    "alignment",
+    "high",
+    "medium",
+    "low",
+}
+
+
+def _oracle_contact_descriptor_keyword_groups(*values):
+    groups = []
+    seen = set()
+    for value in values:
+        for token in _flatten_descriptor_values(value):
+            normalized = _oracle_contact_normalize_name(token)
+            if (
+                not normalized
+                or len(normalized) < 3
+                or normalized in ORACLE_CONTACT_DESCRIPTOR_STOPWORDS
+                or normalized in seen
+            ):
+                continue
+            seen.add(normalized)
+            groups.append([normalized])
+    return groups
+
+
+def _oracle_contact_rule_matches_descriptor_group(rule, group):
+    rule_tokens = _oracle_contact_tokens(
+        " ".join(
+            [
+                str(rule.get("target_object", "")),
+                str(rule.get("target_part", "")),
+                " ".join(itertools.chain.from_iterable(rule.get("keywords") or [])),
+            ]
+        )
+    )
+    group_tokens = set()
+    for item in group:
+        group_tokens.update(_oracle_contact_tokens(item))
+    return bool(rule_tokens & group_tokens)
+
+
+def _oracle_contact_goal_role_allowed(query_goal_state):
+    goal_type = _first_label((query_goal_state or {}).get("goal_state_type"), "unknown")
+    return goal_type in {
+        "supported_or_docked_pose",
+        "placement_inside_or_on_target",
+        "aligned_insertion_or_docking",
+        "pouring_target_state",
+        "tool_contact_state",
+    }
+
+
+def _oracle_contact_descriptor_rules(task_key, instruction, query_geometry=None, query_goal_state=None, base_hint=None):
+    query_geometry = query_geometry or {}
+    query_goal_state = query_goal_state or {}
+    base_hint = base_hint or {}
+    manip_keywords = _oracle_contact_descriptor_keyword_groups(
+        task_key,
+        instruction,
+        query_geometry.get("manipulated_object"),
+        query_geometry.get("target_part"),
+        query_geometry.get("contact_region"),
+        query_geometry.get("secondary_parts"),
+        query_geometry.get("geometry_tags"),
+        query_goal_state.get("manipulated_object"),
+        query_goal_state.get("contact_or_release_target"),
+        base_hint.get("target_object"),
+        base_hint.get("target_part"),
+        base_hint.get("contact_region_text"),
+    )
+    rules = []
+    if manip_keywords:
+        rules.append(
+            {
+                "role": "manipulated_object_contact",
+                "target_object": _first_label(query_geometry.get("manipulated_object"), task_key),
+                "target_part": _first_label(
+                    query_geometry.get("contact_region") or query_geometry.get("target_part") or base_hint.get("target_part"),
+                    "task_relevant_part",
+                ),
+                "keywords": manip_keywords,
+                "contact_mode": base_hint.get("contact_mode") or "region_hint",
+                "allow_multiple": True,
+                "max_matches": 3,
+                "descriptor_guided": True,
+            }
+        )
+    if _oracle_contact_goal_role_allowed(query_goal_state):
+        goal_keywords = _oracle_contact_descriptor_keyword_groups(
+            query_goal_state.get("target_object_or_region"),
+            query_goal_state.get("contact_or_release_target"),
+            query_goal_state.get("required_final_relation"),
+            query_goal_state.get("required_orientation_or_alignment"),
+            query_goal_state.get("goal_tags"),
+            query_geometry.get("constraint_type"),
+            query_geometry.get("geometry_tags"),
+        )
+        if goal_keywords:
+            rules.append(
+                {
+                    "role": "goal_region",
+                    "target_object": _first_label(query_goal_state.get("target_object_or_region"), "goal_region"),
+                    "target_part": _first_label(query_goal_state.get("contact_or_release_target"), "goal_region"),
+                    "keywords": goal_keywords,
+                    "contact_mode": "goal_region",
+                    "allow_multiple": True,
+                    "max_matches": 3,
+                    "descriptor_guided": True,
+                }
+            )
+    return rules
+
+
+def _oracle_contact_rules_for_task(task_key, instruction, query_geometry=None, query_goal_state=None, base_hint=None):
+    descriptor_rules = _oracle_contact_descriptor_rules(
+        task_key,
+        instruction,
+        query_geometry=query_geometry,
+        query_goal_state=query_goal_state,
+        base_hint=base_hint,
+    )
+    rules = [copy.deepcopy(rule) for rule in ORACLE_CONTACT_ROLE_RULES.get(task_key, [])]
+    if not rules:
+        return descriptor_rules
+
+    for rule in rules:
+        rule["descriptor_guided"] = True
+        rule["descriptor_keyword_groups_used"] = [
+            group
+            for descriptor_rule in descriptor_rules
+            for group in descriptor_rule.get("keywords", [])
+            if _oracle_contact_rule_matches_descriptor_group(rule, group)
+        ]
+    if task_key in ORACLE_CONTACT_STRICT_TASK_RULES:
+        return rules
+    existing_keys = {
+        (
+            str(rule.get("role", "")),
+            str(rule.get("target_object", "")),
+            str(rule.get("target_part", "")),
+        )
+        for rule in rules
+    }
+    for descriptor_rule in descriptor_rules:
+        key = (
+            str(descriptor_rule.get("role", "")),
+            str(descriptor_rule.get("target_object", "")),
+            str(descriptor_rule.get("target_part", "")),
+        )
+        if key in existing_keys:
+            continue
+        fallback_rule = copy.deepcopy(descriptor_rule)
+        fallback_rule["descriptor_fallback"] = True
+        rules.append(fallback_rule)
+        existing_keys.add(key)
+    return rules
+
+
+def _oracle_contact_select_candidates(areas, rule):
+    scored = []
+    for item in areas.values():
+        score = _oracle_contact_keyword_score(item["mask_name"], rule.get("keywords") or [])
+        if score <= 0:
+            continue
+        scored.append((score, item["area_pixels"], item))
+    if not scored:
+        return []
+    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    max_matches = int(rule.get("max_matches", 1 if not rule.get("allow_multiple") else 3))
+    return [
+        {
+            **item,
+            "oracle_match_score": int(score),
+            "oracle_match_reason": "keyword_mask_match",
+        }
+        for score, _, item in scored[:max_matches]
+    ]
+
+
+def _oracle_contact_nearest_mask_pixel_to_centroid(mask, mask_id):
+    ys, xs = np.where(mask == mask_id)
+    if len(xs) == 0:
+        raise ValueError(f"mask id {mask_id} has no pixels")
+    mean_x = float(np.mean(xs))
+    mean_y = float(np.mean(ys))
+    idx = int(np.argmin((xs - mean_x) ** 2 + (ys - mean_y) ** 2))
+    return int(xs[idx]), int(ys[idx]), mean_x, mean_y
+
+
+def _oracle_contact_nearest_mask_pixel_to_xy(mask, mask_id, target_x, target_y):
+    ys, xs = np.where(mask == mask_id)
+    if len(xs) == 0:
+        raise ValueError(f"mask id {mask_id} has no pixels")
+    mean_x = float(np.mean(xs))
+    mean_y = float(np.mean(ys))
+    idx = int(np.argmin((xs - float(target_x)) ** 2 + (ys - float(target_y)) ** 2))
+    return int(xs[idx]), int(ys[idx]), mean_x, mean_y
+
+
+def _oracle_contact_local_world_point(mask, point_cloud, x, y, mask_id, window_radius=2):
+    height, width = mask.shape[:2]
+    x0, x1 = max(0, x - window_radius), min(width - 1, x + window_radius)
+    y0, y1 = max(0, y - window_radius), min(height - 1, y + window_radius)
+    local_mask = mask[y0 : y1 + 1, x0 : x1 + 1]
+    local_cloud = point_cloud[y0 : y1 + 1, x0 : x1 + 1]
+    same_mask = local_mask == mask_id
+    points = local_cloud[same_mask]
+    points = points[np.all(np.isfinite(points), axis=1)]
+    if len(points):
+        return {
+            "world_xyz": np.median(points, axis=0).astype(float).tolist(),
+            "point_source": "median_same_mask_local_window",
+            "num_points_used": int(len(points)),
+        }
+    point = point_cloud[y, x]
+    if getattr(point, "shape", None) == (3,) and np.all(np.isfinite(point)):
+        return {
+            "world_xyz": point.astype(float).tolist(),
+            "point_source": "exact_pixel_point_cloud",
+            "num_points_used": 1,
+        }
+    return {"world_xyz": None, "point_source": "unavailable", "num_points_used": 0}
+
+
+def _oracle_contact_add_tool_working_edge_roles(task_key, roles, mask, point_cloud, camera):
+    if task_key == "water_plants":
+        manipulated = next(
+            (
+                role
+                for role in roles
+                if role.get("role") == "manipulated_object_contact"
+                and "water" in str(role.get("target_object", "")).lower()
+                and role.get("mask_id") is not None
+            ),
+            None,
+        )
+        goal = next(
+            (
+                role
+                for role in roles
+                if role.get("role") == "goal_region"
+                and role.get("centroid_xy_float") is not None
+            ),
+            None,
+        )
+        if not manipulated or not goal:
+            return roles
+        goal_x, goal_y = goal.get("centroid_xy_float", [None, None])
+        if goal_x is None or goal_y is None:
+            return roles
+        height, width = mask.shape[:2]
+        try:
+            x, y, mean_x, mean_y = _oracle_contact_nearest_mask_pixel_to_xy(
+                mask,
+                manipulated["mask_id"],
+                goal_x,
+                goal_y,
+            )
+            world_info = _oracle_contact_local_world_point(mask, point_cloud, x, y, manipulated["mask_id"])
+        except Exception:
+            return roles
+
+        world_xyz = world_info.get("world_xyz")
+        voxel_xyz = None
+        if world_xyz is not None:
+            try:
+                voxel_xyz = point_to_voxel_index(np.array(world_xyz, dtype=np.float32)).astype(int).tolist()
+            except Exception:
+                voxel_xyz = None
+        roles.append(
+            {
+                "role": "tool_working_edge",
+                "target_object": "watering_can",
+                "target_part": "spout_or_head_nearest_plant",
+                "contact_mode": "pouring_edge",
+                "source_view": f"{camera}_rgb_initial",
+                "source_model": f"mask_oracle_{camera}_nearest_waterer_edge_to_plant",
+                "mask_id": manipulated["mask_id"],
+                "mask_name": manipulated.get("mask_name"),
+                "pixel_xy": [int(x), int(y)],
+                f"point_2d_normalized_{camera}": [float(x / max(width - 1, 1)), float(y / max(height - 1, 1))],
+                "world_xyz": world_xyz,
+                "voxel_xyz": voxel_xyz,
+                "centroid_xy_float": [mean_x, mean_y],
+                "point_source": world_info.get("point_source"),
+                "num_points_used": world_info.get("num_points_used"),
+                "oracle_match_score": manipulated.get("oracle_match_score"),
+                "oracle_match_reason": "nearest_watering_can_mask_pixel_to_plant_centroid",
+                "descriptor_guided": True,
+                "descriptor_keyword_groups_used": [["watering_can"], ["spout"], ["plant"]],
+            }
+        )
+        return roles
+
+    if task_key != "scoop_with_spatula":
+        return roles
+    manipulated = next(
+        (
+            role
+            for role in roles
+            if role.get("role") == "manipulated_object_contact"
+            and "spatula" in str(role.get("target_object", "")).lower()
+            and role.get("mask_id") is not None
+        ),
+        None,
+    )
+    secondary = next(
+        (
+            role
+            for role in roles
+            if role.get("role") == "secondary_object_to_move"
+            and role.get("centroid_xy_float") is not None
+        ),
+        None,
+    )
+    if not manipulated or not secondary:
+        return roles
+
+    sec_x, sec_y = secondary.get("centroid_xy_float", [None, None])
+    if sec_x is None or sec_y is None:
+        return roles
+    height, width = mask.shape[:2]
+    try:
+        x, y, mean_x, mean_y = _oracle_contact_nearest_mask_pixel_to_xy(
+            mask,
+            manipulated["mask_id"],
+            sec_x,
+            sec_y,
+        )
+        world_info = _oracle_contact_local_world_point(mask, point_cloud, x, y, manipulated["mask_id"])
+    except Exception:
+        return roles
+
+    world_xyz = world_info.get("world_xyz")
+    voxel_xyz = None
+    if world_xyz is not None:
+        try:
+            voxel_xyz = point_to_voxel_index(np.array(world_xyz, dtype=np.float32)).astype(int).tolist()
+        except Exception:
+            voxel_xyz = None
+    roles.append(
+        {
+            "role": "tool_working_edge",
+            "target_object": "spatula",
+            "target_part": "spatula_blade_edge_nearest_object",
+            "contact_mode": "tool_object_contact_edge",
+            "source_view": f"{camera}_rgb_initial",
+            "source_model": f"mask_oracle_{camera}_nearest_tool_edge_to_secondary",
+            "mask_id": manipulated["mask_id"],
+            "mask_name": manipulated.get("mask_name"),
+            "pixel_xy": [int(x), int(y)],
+            f"point_2d_normalized_{camera}": [float(x / max(width - 1, 1)), float(y / max(height - 1, 1))],
+            "world_xyz": world_xyz,
+            "voxel_xyz": voxel_xyz,
+            "centroid_xy_float": [mean_x, mean_y],
+            "point_source": world_info.get("point_source"),
+            "num_points_used": world_info.get("num_points_used"),
+            "oracle_match_score": manipulated.get("oracle_match_score"),
+            "oracle_match_reason": "nearest_spatula_mask_pixel_to_secondary_object_centroid",
+            "descriptor_guided": True,
+            "descriptor_keyword_groups_used": [["spatula"], ["blade"], ["scoop"]],
+        }
+    )
+    return roles
+
+
+def _oracle_contact_build_camera_roles(
+    task_key,
+    instruction,
+    mask_dict,
+    mask_id_to_sim_name,
+    point_cloud_dict,
+    camera,
+    query_geometry=None,
+    query_goal_state=None,
+    base_hint=None,
+):
+    if camera not in mask_dict or camera not in point_cloud_dict:
+        return []
+    mask = mask_dict[camera]
+    point_cloud = point_cloud_dict[camera]
+    height, width = mask.shape[:2]
+    areas = _oracle_contact_mask_areas(mask, mask_id_to_sim_name)
+    rules = _oracle_contact_rules_for_task(
+        task_key,
+        instruction,
+        query_geometry=query_geometry,
+        query_goal_state=query_goal_state,
+        base_hint=base_hint,
+    )
+    roles = []
+    for rule in rules:
+        for candidate in _oracle_contact_select_candidates(areas, rule):
+            x, y, mean_x, mean_y = _oracle_contact_nearest_mask_pixel_to_centroid(mask, candidate["mask_id"])
+            world_info = _oracle_contact_local_world_point(mask, point_cloud, x, y, candidate["mask_id"])
+            world_xyz = world_info.get("world_xyz")
+            voxel_xyz = None
+            if world_xyz is not None:
+                try:
+                    voxel_xyz = point_to_voxel_index(np.array(world_xyz, dtype=np.float32)).astype(int).tolist()
+                except Exception:
+                    voxel_xyz = None
+            roles.append(
+                {
+                    "role": rule.get("role", "manipulated_object_contact"),
+                    "target_object": rule.get("target_object", task_key),
+                    "target_part": rule.get("target_part", "unknown"),
+                    "contact_mode": rule.get("contact_mode", "region_hint"),
+                    "source_view": f"{camera}_rgb_initial",
+                    "source_model": f"mask_oracle_{camera}_centroid",
+                    "mask_id": candidate["mask_id"],
+                    "mask_name": candidate["mask_name"],
+                    "pixel_xy": [int(x), int(y)],
+                    f"point_2d_normalized_{camera}": [float(x / max(width - 1, 1)), float(y / max(height - 1, 1))],
+                    "world_xyz": world_xyz,
+                    "voxel_xyz": voxel_xyz,
+                    "centroid_xy_float": [mean_x, mean_y],
+                    "point_source": world_info.get("point_source"),
+                    "num_points_used": world_info.get("num_points_used"),
+                    "oracle_match_score": candidate.get("oracle_match_score"),
+                    "oracle_match_reason": candidate.get("oracle_match_reason"),
+                    "descriptor_guided": bool(rule.get("descriptor_guided")),
+                    "descriptor_keyword_groups_used": rule.get("descriptor_keyword_groups_used", []),
+                }
+            )
+    return _oracle_contact_add_tool_working_edge_roles(task_key, roles, mask, point_cloud, camera)
+
+
+def _oracle_contact_role_group_key(role):
+    return (
+        str(role.get("role", "")),
+        str(role.get("target_object", "")),
+        str(role.get("target_part", "")),
+    )
+
+
+def _oracle_contact_distance(a, b):
+    if a is None or b is None:
+        return None
+    return float(np.linalg.norm(np.array(a, dtype=np.float32) - np.array(b, dtype=np.float32)))
+
+
+def _oracle_contact_match_front_role(overhead_role, front_roles, used_front):
+    key = _oracle_contact_role_group_key(overhead_role)
+    candidates = []
+    for idx, front_role in enumerate(front_roles):
+        if idx in used_front or _oracle_contact_role_group_key(front_role) != key:
+            continue
+        world_distance = _oracle_contact_distance(overhead_role.get("world_xyz"), front_role.get("world_xyz"))
+        voxel_distance = _oracle_contact_distance(overhead_role.get("voxel_xyz"), front_role.get("voxel_xyz"))
+        candidates.append((world_distance if world_distance is not None else float("inf"), idx, front_role, world_distance, voxel_distance))
+    if not candidates:
+        return None, None, None, None
+    candidates.sort(key=lambda item: item[0])
+    _, idx, front_role, world_distance, voxel_distance = candidates[0]
+    return idx, front_role, world_distance, voxel_distance
+
+
+def _oracle_contact_choose_final_roles(front_roles, overhead_roles, world_threshold_m=0.08, voxel_threshold=8.0):
+    used_front = set()
+    final_roles = []
+    for final_index, overhead_role in enumerate(overhead_roles, start=1):
+        front_idx, front_role, world_distance, voxel_distance = _oracle_contact_match_front_role(
+            overhead_role,
+            front_roles,
+            used_front,
+        )
+        if front_idx is not None:
+            used_front.add(front_idx)
+        confirmed = (
+            world_distance is not None
+            and voxel_distance is not None
+            and world_distance <= world_threshold_m
+            and voxel_distance <= voxel_threshold
+        )
+        if front_role is None:
+            status = "overhead_only_no_front_match"
+        elif confirmed:
+            status = "confirmed_by_front_and_overhead"
+        else:
+            status = "disagreed_use_overhead"
+        final_roles.append(
+            {
+                "final_index": final_index,
+                "role": overhead_role.get("role"),
+                "target_object": overhead_role.get("target_object"),
+                "target_part": overhead_role.get("target_part"),
+                "contact_mode": overhead_role.get("contact_mode"),
+                "source_view": "overhead_rgb_initial",
+                "chosen_source_view": "overhead_rgb_initial",
+                "selection_status": status,
+                "world_distance_m": world_distance,
+                "voxel_distance": voxel_distance,
+                "chosen_pixel_xy_overhead": overhead_role.get("pixel_xy"),
+                "chosen_world_xyz": overhead_role.get("world_xyz"),
+                "chosen_voxel_xyz": overhead_role.get("voxel_xyz"),
+                "overhead": overhead_role,
+                "front_match": front_role,
+            }
+        )
+    for front_idx, front_role in enumerate(front_roles):
+        if front_idx in used_front:
+            continue
+        final_roles.append(
+            {
+                "final_index": len(final_roles) + 1,
+                "role": front_role.get("role"),
+                "target_object": front_role.get("target_object"),
+                "target_part": front_role.get("target_part"),
+                "contact_mode": front_role.get("contact_mode"),
+                "source_view": "front_rgb_initial",
+                "chosen_source_view": "front_rgb_initial",
+                "selection_status": "front_only_no_overhead_match",
+                "world_distance_m": None,
+                "voxel_distance": None,
+                "chosen_pixel_xy_front": front_role.get("pixel_xy"),
+                "chosen_world_xyz": front_role.get("world_xyz"),
+                "chosen_voxel_xyz": front_role.get("voxel_xyz"),
+                "overhead": None,
+                "front_match": front_role,
+            }
+        )
+    return final_roles
+
+
+def _oracle_contact_role_label(role_name):
+    labels = {
+        "manipulated_object_contact": "contact point",
+        "goal_region": "goal target point",
+        "secondary_object_to_move": "secondary object point",
+        "constraint_region": "constraint/reference point",
+        "constraint_reference": "constraint/reference point",
+        "tool_working_edge": "tool working-edge point",
+    }
+    return labels.get(str(role_name), str(role_name))
+
+
+def _format_oracle_contact_hint_text(final_roles):
+    if not final_roles:
+        return "No role-labeled 3D contact hints available for this query."
+    lines = []
+    for role in final_roles:
+        lines.append(
+            (
+                f"{role['final_index']}. role={role.get('role')} "
+                f"({ _oracle_contact_role_label(role.get('role')) }); "
+                f"object={role.get('target_object')}; part={role.get('target_part')}; "
+                f"mode={role.get('contact_mode')}; status={role.get('selection_status')}; "
+                f"source_view={role.get('chosen_source_view') or role.get('source_view')}; "
+                f"world_xyz={role.get('chosen_world_xyz')}; voxel_xyz={role.get('chosen_voxel_xyz')}"
+            )
+        )
+    return "\n".join(lines)
+
+
+def _oracle_multiview_contact_hints_from_scene(
+    task_key,
+    instruction,
+    mask_dict,
+    mask_id_to_sim_name,
+    point_cloud_dict,
+    base_hint,
+    query_geometry=None,
+    query_goal_state=None,
+):
+    try:
+        front_roles = _oracle_contact_build_camera_roles(
+            task_key,
+            instruction,
+            mask_dict,
+            mask_id_to_sim_name,
+            point_cloud_dict,
+            "front",
+            query_geometry=query_geometry,
+            query_goal_state=query_goal_state,
+            base_hint=base_hint,
+        )
+        overhead_roles = _oracle_contact_build_camera_roles(
+            task_key,
+            instruction,
+            mask_dict,
+            mask_id_to_sim_name,
+            point_cloud_dict,
+            "overhead",
+            query_geometry=query_geometry,
+            query_goal_state=query_goal_state,
+            base_hint=base_hint,
+        )
+        final_roles = _oracle_contact_choose_final_roles(front_roles, overhead_roles)
+    except Exception as exc:
+        hint = dict(base_hint)
+        hint.update(
+            {
+                "source_model": "mask_oracle_front_overhead_centroid_consistency",
+                "source_view": "front_rgb_initial+overhead_rgb_initial",
+                "candidate_contact_coordinates": [],
+                "role_labeled_points": [],
+                "llm_contact_hint_text": f"Oracle multiview contact extraction failed: {exc}",
+            }
+        )
+        return hint
+
+    hint = dict(base_hint)
+    hint.update(
+        {
+            "source_model": "mask_oracle_front_overhead_centroid_consistency",
+            "source_view": "front_rgb_initial+overhead_rgb_initial",
+            "source_note": "Role rules are seeded by task descriptors g_j/h_j and checked with simulator masks/point clouds.",
+            "descriptor_context": {
+                "geometry_g_j": query_geometry or {},
+                "goal_state_h_j": query_goal_state or {},
+            },
+            "candidate_contact_coordinates": final_roles,
+            "role_labeled_points": [
+                {
+                    "index": role.get("final_index"),
+                    "role": role.get("role"),
+                    "role_label": _oracle_contact_role_label(role.get("role")),
+                    "target_object": role.get("target_object"),
+                    "target_part": role.get("target_part"),
+                    "contact_mode": role.get("contact_mode"),
+                    "selection_status": role.get("selection_status"),
+                    "world_xyz": role.get("chosen_world_xyz"),
+                    "voxel_xyz": role.get("chosen_voxel_xyz"),
+                    "source_view": role.get("chosen_source_view") or role.get("source_view"),
+                    "world_distance_m": role.get("world_distance_m"),
+                    "voxel_distance": role.get("voxel_distance"),
+                }
+                for role in final_roles
+            ],
+            "llm_contact_hint_text": _format_oracle_contact_hint_text(final_roles),
+        }
+    )
+    if final_roles:
+        first_contact = next((role for role in final_roles if role.get("role") == "manipulated_object_contact"), final_roles[0])
+        hint["contact_mode"] = first_contact.get("contact_mode") or hint.get("contact_mode")
+        hint["target_object"] = first_contact.get("target_object") or hint.get("target_object")
+        hint["target_part"] = first_contact.get("target_part") or hint.get("target_part")
+        hint["contact_region_text"] = first_contact.get("target_part") or hint.get("contact_region_text")
+    return hint
+
+
 def _contact_hints_from_affordance(task_key, affordance, use_as):
     affordance = affordance or {}
     region = _first_label(affordance.get("required_contact_region"), "unknown")
     points = affordance.get("preferred_contact_points") or []
     return {
+        "source_model": "symbolic_affordance_descriptor",
         "contact_mode": _contact_mode_from_affordance(affordance),
         "source_view": "front_rgb_initial",
         "target_object": _first_label(task_key, "unknown"),
@@ -1931,18 +3479,45 @@ def _contact_hints_from_affordance(task_key, affordance, use_as):
         "points_2d_normalized": points,
         "contact_region_text": region,
         "candidate_contact_coordinates": [],
+        "role_labeled_points": [],
+        "llm_contact_hint_text": "No role-labeled 3D contact hints available for this query.",
         "use_as": use_as,
     }
 
 
-def _query_descriptors(task_key, language_goal):
+def _query_descriptors(task_key, language_goal, mask_dict=None, mask_id_to_sim_name=None, point_cloud_dict=None):
     if task_key in UNSEEN_DESCRIPTOR_RULES:
         item = UNSEEN_DESCRIPTOR_RULES[task_key]
         affordance = item.get("affordance") or {}
-        return (
-            _canonical_geometry(task_key, item["geometry"], affordance),
-            _contact_hints_from_affordance(task_key, affordance, "unseen_query_contact_region_hint_not_retrieval"),
+        query_geometry = _canonical_geometry(task_key, item["geometry"], affordance)
+        query_profile = _interaction_profile(task_key, query_geometry, affordance)
+        query_goal_state = _goal_state_descriptor(
+            task_key,
+            query_geometry,
+            affordance,
+            query_profile,
+            raw_goal=(
+                query_geometry.get("goal_state_h_j")
+                or query_geometry.get("target_pose_h_j")
+                or query_geometry.get("target_pose_j")
+                or query_geometry.get("target_pose")
+                or query_geometry.get("goal_state_descriptor_j")
+            ),
+            use_as="query_goal_state",
         )
+        contact_hint = _contact_hints_from_affordance(task_key, affordance, "unseen_query_contact_region_hint_not_retrieval")
+        if mask_dict is not None and point_cloud_dict is not None:
+            contact_hint = _oracle_multiview_contact_hints_from_scene(
+                task_key,
+                language_goal,
+                mask_dict,
+                mask_id_to_sim_name or {},
+                point_cloud_dict,
+                contact_hint,
+                query_geometry=query_geometry,
+                query_goal_state=query_goal_state,
+            )
+        return query_geometry, contact_hint
     text = language_goal.lower().replace(" ", "_")
     geometry = {
         "manipulated_object": task_key,
@@ -1953,11 +3528,32 @@ def _query_descriptors(task_key, language_goal):
         "clearance_geometry": "unknown",
         "task_relevant_geometric_cues": _normalize_token(text),
     }
-    return _canonical_geometry(task_key, geometry, {}), _contact_hints_from_affordance(
+    query_geometry = _canonical_geometry(task_key, geometry, {})
+    query_profile = _interaction_profile(task_key, query_geometry, {})
+    query_goal_state = _goal_state_descriptor(
+        task_key,
+        query_geometry,
+        {},
+        query_profile,
+        use_as="query_goal_state",
+    )
+    contact_hint = _contact_hints_from_affordance(
         task_key,
         {},
         "unseen_query_contact_region_hint_not_retrieval",
     )
+    if mask_dict is not None and point_cloud_dict is not None:
+        contact_hint = _oracle_multiview_contact_hints_from_scene(
+            task_key,
+            language_goal,
+            mask_dict,
+            mask_id_to_sim_name or {},
+            point_cloud_dict,
+            contact_hint,
+            query_geometry=query_geometry,
+            query_goal_state=query_goal_state,
+        )
+    return query_geometry, contact_hint
 
 
 def _format_value(value):
@@ -1969,9 +3565,121 @@ def _format_value(value):
 def _format_feature_block(title, values, fields):
     lines = [f"{title}:"]
     for field in fields:
-        default = [] if field in {"secondary_parts", "geometry_tags", "points_2d_normalized", "candidate_contact_coordinates", "goal_tags"} else "unknown"
+        default = [] if field in {"secondary_parts", "geometry_tags", "points_2d_normalized", "candidate_contact_coordinates", "role_labeled_points", "goal_tags"} else "unknown"
         lines.append(f"- {field}: {_format_value(values.get(field, default))}")
     return "\n".join(lines)
+
+
+def _compact_descriptor_value(values, field, default="unknown"):
+    value = values.get(field, default) if values else default
+    if value is None or value == "":
+        return default
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(str(item) for item in value) if value else default
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
+def _compact_motion_text(geometry):
+    motion_axis = _compact_descriptor_value(geometry, "motion_axis")
+    motion_type = _compact_descriptor_value(geometry, "motion_type")
+    if motion_axis == "unknown":
+        return motion_type
+    if motion_type == "unknown" or motion_type == motion_axis:
+        return motion_axis
+    return f"{motion_axis} ({motion_type})"
+
+
+def _compact_contact_text(geometry):
+    contact_type = _compact_descriptor_value(geometry, "contact_type")
+    contact_region = _compact_descriptor_value(geometry, "contact_region")
+    if contact_type == "unknown":
+        return contact_region
+    if contact_region == "unknown":
+        return contact_type
+    return f"{contact_type} {contact_region}"
+
+
+def _compact_constraint_text(geometry, goal_state):
+    constraint_type = _compact_descriptor_value(geometry, "constraint_type")
+    alignment = _compact_descriptor_value(geometry, "alignment_requirement")
+    motion_constraint = _compact_descriptor_value(goal_state, "required_motion_constraint")
+    parts = []
+    if constraint_type != "unknown":
+        parts.append(constraint_type)
+    if motion_constraint != "unknown" and motion_constraint != constraint_type:
+        parts.append(motion_constraint)
+    if alignment != "unknown":
+        parts.append(f"alignment={alignment}")
+    return "; ".join(parts) if parts else "unknown"
+
+
+def _format_compact_seen_descriptor(geometry, goal_state):
+    return "\n".join(
+        [
+            "Seen-demo analogy descriptor:",
+            f"- primitive: {_compact_descriptor_value(geometry, 'action_primitive')}",
+            f"- motion: {_compact_motion_text(geometry)}",
+            f"- contact: {_compact_contact_text(geometry)}",
+            f"- constraint: {_compact_constraint_text(geometry, goal_state)}",
+            f"- success_relation: {_compact_descriptor_value(goal_state, 'required_final_relation')}",
+        ]
+    )
+
+
+def _format_compact_query_descriptor(geometry, goal_state):
+    target = _compact_descriptor_value(goal_state, "target_object_or_region")
+    alignment = _compact_descriptor_value(goal_state, "required_orientation_or_alignment")
+    stop = _compact_descriptor_value(goal_state, "release_or_stop_condition")
+    return "\n".join(
+        [
+            "Authoritative query descriptor:",
+            f"- primitive: {_compact_descriptor_value(geometry, 'action_primitive')}",
+            f"- motion: {_compact_motion_text(geometry)}",
+            f"- contact: {_compact_contact_text(geometry)}",
+            f"- constraint: {_compact_constraint_text(geometry, goal_state)}",
+            f"- target: {target}",
+            f"- success_relation: {_compact_descriptor_value(goal_state, 'required_final_relation')}",
+            f"- alignment: {alignment}",
+            f"- stop_when: {stop}",
+        ]
+    )
+
+
+def _format_compact_query_contact_hints(contact_hints):
+    if not contact_hints:
+        return "Query contact hints c_j:\n- none"
+    summary = contact_hints.get("llm_contact_hint_text")
+    if summary:
+        return "\n".join(
+            [
+                "Query contact hints c_j:",
+                f"- source: {_compact_descriptor_value(contact_hints, 'source_model')}",
+                f"- contact_mode: {_compact_descriptor_value(contact_hints, 'contact_mode')}",
+                "- role_labeled_points:",
+                str(summary),
+            ]
+        )
+    points = contact_hints.get("role_labeled_points") or []
+    if points:
+        lines = [
+            "Query contact hints c_j:",
+            f"- source: {_compact_descriptor_value(contact_hints, 'source_model')}",
+            f"- contact_mode: {_compact_descriptor_value(contact_hints, 'contact_mode')}",
+            "- role_labeled_points:",
+        ]
+        for point in points:
+            lines.append(
+                (
+                    f"{point.get('index', '?')}. role={point.get('role', 'unknown')} "
+                    f"({point.get('role_label', 'point')}); object={point.get('target_object', 'unknown')}; "
+                    f"part={point.get('target_part', 'unknown')}; voxel_xyz={point.get('voxel_xyz', 'unknown')}; "
+                    f"world_xyz={point.get('world_xyz', 'unknown')}"
+                )
+            )
+        return "\n".join(lines)
+    return "Query contact hints c_j:\n- No role-labeled 3D contact hints available for this query."
 
 
 def _format_geometry_field_guide():
@@ -1993,13 +3701,16 @@ def _format_geometry_field_guide():
 def _format_contact_field_guide():
     return "\n".join(
         [
-            "Contact hint field guide:",
+            "Query contact hint field guide:",
+            "- source_model: where the contact hints came from; mask_oracle_front_overhead_centroid_consistency means front/top mask points were projected into 3D and checked for agreement.",
             "- contact_mode: whether the hint is a single contact, grasp pair, press point, or region-level cue.",
             "- target_object and target_part: the object and part the contact hint refers to.",
             "- points_2d_normalized: optional image-space points in normalized coordinates; use as visual contact hints for action generation, never as retrieval scores.",
             "- contact_region_text: short natural-language region name for the intended contact.",
-            "- candidate_contact_coordinates: optional 3D/voxel contact candidates when available.",
-            "- use_as: explains whether the hint is from a seen demo or the unseen query.",
+            "- candidate_contact_coordinates: optional raw 3D/voxel candidates when available.",
+            "- role_labeled_points: the action-generation contact hints. Each point states its role, such as contact point, goal target point, secondary object point, or constraint/reference point, with world_xyz and voxel_xyz.",
+            "- llm_contact_hint_text: the compact role-labeled query summary copied into the final LLM prompt.",
+            "- use_as: should identify these as unseen query contact hints. Retrieved seen demonstrations intentionally omit c_i contact hints from the final prompt.",
         ]
     )
 
@@ -2030,27 +3741,35 @@ def _format_profile_block(title, values):
 
 def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_affordance, ranking_metric, top_k):
     review_cache = _load_augmented_review_cache()
-    sim_min = float(np.min(similarity))
-    sim_max = float(np.max(similarity))
+    rerank_pool_requested = _rerank_candidate_count(len(all_demo_paths), top_k)
+    candidates = _dynamic_shortlist_candidates(
+        similarity,
+        all_demo_paths,
+        review_cache,
+        rerank_pool_requested,
+    )
+    candidate_scores = [candidate["dynamic_score_raw"] for candidate in candidates]
+    sim_min = min(candidate_scores) if candidate_scores else 0.0
+    sim_max = max(candidate_scores) if candidate_scores else 0.0
     sim_span = sim_max - sim_min
     alpha, beta, gamma = _augmented_weights(ranking_metric)
     delta, penalty_weight = _profile_weights(ranking_metric)
     use_v2 = _is_v2_ranking(ranking_metric)
-    use_v3 = _is_v3_ranking(ranking_metric)
+    use_v3 = _is_v3_ranking(ranking_metric) or _is_retrieval_reranking_metric(ranking_metric) or _is_phase_ranking(ranking_metric)
     use_v4 = _is_v4_ranking(ranking_metric)
     use_plan = _is_plan_ranking(ranking_metric)
     plan_weight = float(os.environ.get("XICM_GA_PLAN_WEIGHT", "0.45")) if use_plan else 0.0
     query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
     query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
     ranked = []
-    for idx, demo_path in enumerate(all_demo_paths):
-        task, episode_id = _task_episode_from_path(demo_path)
-        row = review_cache.get((task, episode_id))
-        if row is None:
-            continue
+    for candidate in candidates:
+        idx = candidate["index"]
+        task = candidate["task"]
+        episode_id = candidate["episode_id"]
+        row = candidate["row"]
         seen_affordance = row.get("contact_hints_i") or row.get("affordance_a_i") or {}
         seen_geometry = _canonical_geometry(task, row.get("geometry_g_i") or {}, seen_affordance)
-        s_dyn = 0.0 if sim_span == 0 else (float(similarity[idx]) - sim_min) / sim_span
+        s_dyn = 0.0 if sim_span == 0 else (candidate["dynamic_score_raw"] - sim_min) / sim_span
         s_geo = _geometry_similarity(seen_geometry, query_geometry)
         s_aff = 0.0
         seen_profile = _interaction_profile(task, seen_geometry, seen_affordance)
@@ -2106,6 +3825,10 @@ def _rank_augmented_indices(similarity, all_demo_paths, query_geometry, query_af
                 "index": idx,
                 "task": task,
                 "episode_id": episode_id,
+                "dynamic_rank": candidate["dynamic_rank"],
+                "dynamic_score_raw": candidate["dynamic_score_raw"],
+                "rerank_pool_size": len(candidates),
+                "rerank_pool_requested": rerank_pool_requested,
                 "s_dyn": s_dyn,
                 "s_geo": s_geo,
                 "s_aff": s_aff,
@@ -2137,7 +3860,20 @@ class base_task_handler:
             print(f"Task handler {type(self).__name__} using demonstrations from {self.save_root}")
             random.seed(42)
 
-    def get_user_prompt_ranking(self, mask_dict, mask_id_to_sim_name, point_cloud_dict, custom_num_demos=-1, taskname='None', image_path=None, seed=0, ranking_metric="lang_vis.out"):
+    def get_user_prompt_ranking(
+        self,
+        mask_dict,
+        mask_id_to_sim_name,
+        point_cloud_dict,
+        custom_num_demos=-1,
+        taskname='None',
+        image_path=None,
+        seed=0,
+        ranking_metric="lang_vis.out",
+        current_phase_index=0,
+        completed_phases=None,
+        phase_history=None,
+    ):
         assert os.path.exists(self.save_root), f"Cannot find save root {self.save_root}"
         if custom_num_demos==-1:
             pass
@@ -2165,9 +3901,71 @@ class base_task_handler:
             similarity = np.dot(memory_feat, query_feat)
 
             if _is_augmented_ranking(ranking_metric):
-                query_geometry, query_affordance = _query_descriptors(type(self).__name__, taskname)
+                query_geometry, query_affordance = _query_descriptors(
+                    type(self).__name__,
+                    taskname,
+                    mask_dict=mask_dict,
+                    mask_id_to_sim_name=mask_id_to_sim_name,
+                    point_cloud_dict=point_cloud_dict,
+                )
                 query_geometry = dict(query_geometry)
                 query_geometry["task_key"] = type(self).__name__
+
+                query_profile = _interaction_profile(type(self).__name__, query_geometry, query_affordance)
+                query_goal_state = _goal_state_descriptor(
+                    type(self).__name__,
+                    query_geometry,
+                    query_affordance,
+                    query_profile,
+                    raw_goal=(
+                        query_geometry.get("goal_state_h_j")
+                        or query_geometry.get("target_pose_h_j")
+                        or query_geometry.get("target_pose_j")
+                        or query_geometry.get("target_pose")
+                        or query_geometry.get("goal_state_descriptor_j")
+                    ),
+                    use_as="query_goal_state",
+                )
+                if _is_phase_ranking(ranking_metric):
+                    action_chain = _build_action_chain(
+                        type(self).__name__,
+                        query_geometry,
+                        query_affordance,
+                        query_profile,
+                        query_goal_state,
+                    )
+                    current_phase = _phase_for_index(action_chain, current_phase_index)
+                    ranked_phases = _rank_phase_segments(
+                        similarity,
+                        all_demo_paths,
+                        query_geometry,
+                        query_affordance,
+                        ranking_metric,
+                        self.num_demos,
+                        current_phase,
+                    )
+                    self.last_phase_chain = action_chain
+                    self.last_current_phase = current_phase
+                    self.last_ranked_phase_items = ranked_phases
+                    self.last_query_geometry = query_geometry
+                    self.last_query_affordance = query_affordance
+                    self.last_query_profile = query_profile
+                    self.last_query_goal_state = query_goal_state
+                    return _format_phase_user_prompt(
+                        ranked_phases,
+                        obs,
+                        type(self).__name__,
+                        taskname,
+                        query_geometry,
+                        query_affordance,
+                        action_chain,
+                        current_phase_index=current_phase_index,
+                        completed_phases=completed_phases or [],
+                        phase_history=phase_history or [],
+                        include_geometry=_include_geometry(ranking_metric),
+                        include_affordance=_include_affordance(ranking_metric),
+                    )
+
                 ranked = _rank_augmented_indices(
                     similarity,
                     all_demo_paths,
@@ -2186,8 +3984,8 @@ class base_task_handler:
                     query_affordance,
                     include_geometry=_include_geometry(ranking_metric),
                     include_affordance=_include_affordance(ranking_metric),
-                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric) or _is_v4_ranking(ranking_metric) or _is_plan_ranking(ranking_metric),
-                    use_v3=_is_v3_ranking(ranking_metric),
+                    use_v2=_is_v2_ranking(ranking_metric) or _is_v3_ranking(ranking_metric) or _is_v4_ranking(ranking_metric) or _is_plan_ranking(ranking_metric) or _is_retrieval_reranking_metric(ranking_metric),
+                    use_v3=_is_v3_ranking(ranking_metric) or _is_retrieval_reranking_metric(ranking_metric),
                     use_v4=_is_v4_ranking(ranking_metric),
                     use_plan=_is_plan_ranking(ranking_metric),
                 )
@@ -2679,7 +4477,12 @@ unseen_task_name_to_handler = {
 
 task_name_to_handler = unseen_task_name_to_handler
 def create_task_handler(task_name):
-    return task_name_to_handler[task_name]()
+    if task_name in task_name_to_handler:
+        return task_name_to_handler[task_name]()
+    if task_name in seen_task_name_to_handler:
+        return seen_task_name_to_handler[task_name]()
+    known_tasks = sorted(set(task_name_to_handler) | set(seen_task_name_to_handler))
+    raise KeyError(f"Unknown task handler '{task_name}'. Known tasks: {known_tasks}")
 
 
 train_tasknames=os.listdir(seen_path)
@@ -2943,6 +4746,463 @@ def get_stored_demo_key_action_steps(dataset_root, task_name, episode_id, sim_na
     return result
 
 
+def _dominant_motion_axis_from_actions(actions):
+    if not actions:
+        return "unknown"
+    deltas = []
+    prev = None
+    for action in actions:
+        if not isinstance(action, list) or len(action) < 3:
+            continue
+        xyz = np.asarray(action[:3], dtype=float)
+        if prev is not None:
+            deltas.append(xyz - prev)
+        prev = xyz
+    if not deltas:
+        return "toward_contact"
+    delta = np.sum(np.asarray(deltas), axis=0)
+    abs_delta = np.abs(delta)
+    if float(abs_delta.max()) < 1e-6:
+        return "stationary_or_contact"
+    axis_index = int(abs_delta.argmax())
+    sign = "+" if delta[axis_index] >= 0 else "-"
+    return ["x", "y", "z"][axis_index] + sign
+
+
+def _gripper_transition(actions):
+    states = [int(round(float(action[6]))) for action in actions if isinstance(action, list) and len(action) >= 7]
+    if not states:
+        return "unknown"
+    if any(a == 1 and b == 0 for a, b in zip(states, states[1:])):
+        return "open_to_closed"
+    if any(a == 0 and b == 1 for a, b in zip(states, states[1:])):
+        return "closed_to_open"
+    return "open" if states[-1] == 1 else "closed"
+
+
+def _phase_contact_state_from_transition(transition):
+    if transition == "open_to_closed":
+        return "object_or_part_becomes_held"
+    if transition == "closed_to_open":
+        return "object_or_part_released"
+    if transition == "closed":
+        return "object_or_part_held"
+    if transition == "open":
+        return "no_object_in_gripper_or_surface_contact"
+    return "unknown"
+
+
+def _infer_seen_phase_primitive(task_name, profile, geometry, segment_index, total_segments, actions):
+    family = _family_name(profile)
+    transition = _gripper_transition(actions)
+    if transition == "open_to_closed":
+        return "grasp"
+    if transition == "closed_to_open":
+        return "place_or_release"
+    if segment_index == 0:
+        return "approach"
+    if family in {"button_press", "button_or_switch_press"}:
+        return "press"
+    if family in {"knob_or_handle_rotation", "screw_closure"}:
+        return "rotate"
+    if family in {"linear_pull_from_slot", "linear_handle_pull", "remove_flat_object_from_rack"}:
+        return "pull_or_extract"
+    if family in {"hinged_door_close", "hinged_panel_close"}:
+        return "push_or_rotate_hinge"
+    if family == "hinged_lid_open":
+        return "pull_open_hinge"
+    if family in {"tool_scoop_under_object", "tool_drag_to_target", "sweep_into_receptacle"}:
+        return "slide_or_sweep"
+    if family == "deformable_drag_straighten":
+        return "pull_or_drag"
+    if family == "lift_lid_from_container":
+        return "lift"
+    if family == "pour_to_target":
+        return "tilt_or_pour" if segment_index >= max(1, total_segments - 2) else "move_or_align"
+    if segment_index >= max(1, total_segments - 1):
+        return "place_or_release"
+    if transition == "closed":
+        return "move_or_align"
+    action = _first_label(geometry.get("action_primitive"), "perform_motion")
+    return action if action != "unknown" else "perform_motion"
+
+
+def _primitive_family(primitive):
+    primitive = _first_label(primitive, "unknown")
+    groups = [
+        {"grasp", "grasp_or_contact", "grasp_or_contact_tool", "approach"},
+        {"move_or_align", "insert", "lower", "lift", "lift_or_stop"},
+        {"pull", "pull_or_extract", "pull_open_hinge", "pull_or_drag", "extract"},
+        {"push", "press", "push_or_rotate_hinge"},
+        {"slide", "sweep", "slide_or_sweep", "drag", "scoop"},
+        {"rotate", "twist", "tilt_or_pour"},
+        {"place_or_release", "release", "release_or_stop", "release_or_retract", "untilt_or_stop"},
+    ]
+    for index, group in enumerate(groups):
+        if primitive in group:
+            return f"group_{index}"
+    return primitive
+
+
+def _phase_primitive_match_score(seen_primitive, query_primitive):
+    seen_primitive = _first_label(seen_primitive, "")
+    query_primitive = _first_label(query_primitive, "")
+    if seen_primitive == query_primitive and seen_primitive:
+        return 1.0
+    if _primitive_family(seen_primitive) == _primitive_family(query_primitive):
+        return 0.72
+    return _profile_value_similarity(seen_primitive, query_primitive)
+
+
+def _real_phase_compatibility_multiplier(seen_phase, query_phase):
+    primitive_score = _phase_primitive_match_score(
+        seen_phase.get("primitive", ""),
+        query_phase.get("primitive", ""),
+    )
+    query_primitive = _first_label(query_phase.get("primitive"), "")
+    seen_primitive = _first_label(seen_phase.get("primitive"), "")
+    if query_primitive in {"lift", "lift_or_stop"} and seen_primitive in {"slide_or_sweep", "push", "press", "rotate", "approach"}:
+        return 0.08
+    if query_primitive in {"slide_or_sweep", "pull_or_drag", "pull_or_extract"} and seen_primitive in {"lift", "lift_or_stop", "place_or_release", "release_or_stop"}:
+        return 0.12
+    return 0.30 + 0.70 * max(0.0, min(1.0, primitive_score))
+
+
+def _phase_descriptor_similarity(seen_phase, query_phase):
+    score = 0.0
+    total = 0.0
+    for field, weight in PHASE_FIELD_WEIGHTS.items():
+        if field == "primitive":
+            field_score = _phase_primitive_match_score(seen_phase.get(field), query_phase.get(field))
+        else:
+            field_score = _profile_value_similarity(seen_phase.get(field), query_phase.get(field))
+        score += weight * field_score
+        total += weight
+    return score / total if total else 0.0
+
+
+def get_stored_demo_phase_segments(dataset_root, task_name, episode_id, sim_name_to_real_name, retrieval_item=None, cross_task_eval=1):
+    cache_key = (dataset_root, task_name, episode_id, cross_task_eval)
+    if cache_key in AUGMENTED_DEMO_PHASE_CACHE:
+        return AUGMENTED_DEMO_PHASE_CACHE[cache_key]
+
+    review = _load_augmented_review_cache().get((task_name, episode_id), {})
+    seen_contact_hints = review.get("contact_hints_i") or review.get("affordance_a_i") or {}
+    seen_geometry = _canonical_geometry(task_name, review.get("geometry_g_i") or {}, seen_contact_hints)
+    seen_profile = _interaction_profile(task_name, seen_geometry, seen_contact_hints)
+    demo = get_stored_demo_key_action_steps(
+        dataset_root,
+        task_name,
+        episode_id,
+        sim_name_to_real_name,
+        cross_task_eval=cross_task_eval,
+    )
+    steps = demo.get("steps", [])
+    if not steps:
+        result = {"task_instruction": demo.get("task_instruction", task_name), "phases": []}
+        AUGMENTED_DEMO_PHASE_CACHE[cache_key] = result
+        return result
+
+    breaks = [0]
+    prev_action = steps[0]["action"]
+    prev_axis = _dominant_motion_axis_from_actions([prev_action])
+    for idx in range(1, len(steps)):
+        action = steps[idx]["action"]
+        transition_changed = (
+            isinstance(prev_action, list)
+            and isinstance(action, list)
+            and len(prev_action) >= 7
+            and len(action) >= 7
+            and int(round(float(prev_action[6]))) != int(round(float(action[6])))
+        )
+        pair_axis = _dominant_motion_axis_from_actions([prev_action, action])
+        motion_changed = idx > 1 and pair_axis != prev_axis and "z" not in {pair_axis[:1], prev_axis[:1]}
+        if transition_changed or motion_changed:
+            breaks.append(idx)
+        prev_action = action
+        prev_axis = pair_axis
+    breaks.append(len(steps))
+    breaks = sorted(set(breaks))
+
+    phases = []
+    for phase_id, (start, end) in enumerate(zip(breaks[:-1], breaks[1:])):
+        segment_steps = steps[start:end]
+        if not segment_steps:
+            continue
+        actions = [step["action"] for step in segment_steps]
+        transition = _gripper_transition(actions)
+        primitive = _infer_seen_phase_primitive(task_name, seen_profile, seen_geometry, phase_id, len(breaks) - 1, actions)
+        motion_axis = _dominant_motion_axis_from_actions(actions)
+        phase = {
+            "phase_id": phase_id,
+            "primitive": primitive,
+            "phase_goal": f"{primitive} phase from seen task {task_name}",
+            "contact_state": _phase_contact_state_from_transition(transition),
+            "motion_axis": motion_axis,
+            "target_relation": seen_profile.get("target_relation", "unknown"),
+            "stop_condition": "segment end or next gripper/motion transition",
+            "gripper_transition": transition,
+            "start_step": segment_steps[0]["step"],
+            "end_step": segment_steps[-1]["step"],
+            "steps": segment_steps,
+            "seen_profile": seen_profile,
+            "seen_geometry": seen_geometry,
+            "task_instruction": demo.get("task_instruction", task_name),
+        }
+        phases.append(phase)
+    result = {"task_instruction": demo.get("task_instruction", task_name), "phases": phases}
+    AUGMENTED_DEMO_PHASE_CACHE[cache_key] = result
+    return result
+
+
+def _select_diverse_phase_items(phase_items, top_k):
+    selected = []
+    phase_counts = {}
+    task_counts = {}
+    for item in phase_items:
+        primitive = item.get("phase", {}).get("primitive", "unknown")
+        task = item.get("task", "unknown")
+        if phase_counts.get(primitive, 0) >= int(os.environ.get("XICM_PHASE_MAX_PER_PRIMITIVE", "3")):
+            continue
+        if task_counts.get(task, 0) >= int(os.environ.get("XICM_PHASE_MAX_PER_TASK", "2")):
+            continue
+        selected.append(item)
+        phase_counts[primitive] = phase_counts.get(primitive, 0) + 1
+        task_counts[task] = task_counts.get(task, 0) + 1
+        if len(selected) >= top_k:
+            return selected
+    for item in phase_items:
+        if item not in selected:
+            selected.append(item)
+        if len(selected) >= top_k:
+            break
+    return selected[:top_k]
+
+
+def _direct_phase_candidates_from_review(query_geometry, query_affordance, current_phase, limit):
+    review_cache = _load_augmented_review_cache()
+    query_task = query_geometry.get("task_key") or query_geometry.get("manipulated_object") or ""
+    query_profile = _interaction_profile(query_task, query_geometry, query_affordance)
+    candidates = []
+    for (task, episode_id), row in review_cache.items():
+        seen_contact = row.get("contact_hints_i") or row.get("affordance_a_i") or {}
+        seen_geometry = _canonical_geometry(task, row.get("geometry_g_i") or {}, seen_contact)
+        seen_profile = _interaction_profile(task, seen_geometry, seen_contact)
+        seen_goal = _goal_state_descriptor(
+            task,
+            seen_geometry,
+            seen_contact,
+            seen_profile,
+            raw_goal=(
+                row.get("goal_state_h_i")
+                or row.get("target_pose_h_i")
+                or row.get("target_pose_i")
+                or row.get("target_pose_descriptor_i")
+                or row.get("goal_state_descriptor_i")
+            ),
+            use_as="seen_demo_goal_state",
+        )
+        chain = _build_action_chain(task, seen_geometry, seen_contact, seen_profile, seen_goal)
+        family_score = _contact_family_similarity(seen_profile, query_profile)
+        mechanical_score = _mechanical_similarity(
+            seen_profile,
+            query_profile,
+            seen_geometry,
+            query_geometry,
+            seen_contact,
+            query_affordance,
+        )
+        penalty = _v3_conflict_penalty(seen_profile, query_profile)
+        for template_phase in chain:
+            phase_score = _phase_descriptor_similarity(template_phase, current_phase)
+            score = 0.55 * phase_score + 0.25 * mechanical_score + 0.20 * family_score - 0.20 * penalty
+            candidates.append(
+                {
+                    "score": score,
+                    "phase_score": phase_score,
+                    "mechanical_score": mechanical_score,
+                    "family_score": family_score,
+                    "penalty": penalty,
+                    "task": task,
+                    "episode_id": episode_id,
+                    "template_phase": template_phase,
+                    "seen_profile": seen_profile,
+                    "seen_geometry": seen_geometry,
+                }
+            )
+    candidates.sort(reverse=True, key=lambda item: item["score"])
+    return candidates[:limit]
+
+
+def _real_phase_for_template(task, episode_id, template_phase, current_phase):
+    phase_bundle = get_stored_demo_phase_segments(
+        seen_path,
+        task,
+        episode_id,
+        seen_sim_name_to_real_name[task],
+        cross_task_eval=1,
+    )
+    phases = phase_bundle.get("phases", [])
+    if not phases:
+        return None, 0.0
+    best_phase = None
+    best_score = -1.0
+    for phase in phases:
+        score = 0.60 * _phase_descriptor_similarity(phase, current_phase) + 0.40 * _phase_descriptor_similarity(phase, template_phase)
+        if score > best_score:
+            best_phase = phase
+            best_score = score
+    return best_phase, best_score
+
+
+def _write_phase_retrieval_audit(ranking_metric, query_task, current_phase, ranked_phase_items):
+    audit_path = os.environ.get("XICM_PHASE_RETRIEVAL_AUDIT")
+    if not audit_path:
+        audit_dir = os.environ.get("XICM_GA_RETRIEVAL_AUDIT_DIR")
+        if audit_dir:
+            os.makedirs(audit_dir, exist_ok=True)
+            safe_metric = re.sub(r"[^a-zA-Z0-9_.-]+", "_", ranking_metric)
+            audit_path = os.path.join(audit_dir, f"phase_retrieval_audit_{safe_metric}.jsonl")
+    if not audit_path:
+        return
+    os.makedirs(os.path.dirname(audit_path), exist_ok=True)
+    top = []
+    for item in ranked_phase_items[: int(os.environ.get("XICM_PHASE_AUDIT_TOP", "12"))]:
+        phase = item.get("phase", {})
+        top.append(
+            {
+                "rank": len(top) + 1,
+                "task": item.get("task"),
+                "episode_id": item.get("episode_id"),
+                "parent_demo_rank": item.get("parent_rank"),
+                "phase_id": phase.get("phase_id"),
+                "primitive": phase.get("primitive"),
+                "score": item.get("score"),
+                "phase_score": item.get("phase_score"),
+                "realization_multiplier": item.get("realization_multiplier"),
+                "parent_score": item.get("parent_score"),
+                "target_relation": phase.get("target_relation"),
+            }
+        )
+    with open(audit_path, "a") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "ranking_metric": ranking_metric,
+                    "query_task": query_task,
+                    "current_phase": current_phase,
+                    "top": top,
+                }
+            )
+            + "\n"
+        )
+
+
+def _rank_phase_segments(similarity, all_demo_paths, query_geometry, query_affordance, ranking_metric, top_k, current_phase):
+    parent_pool_size = int(os.environ.get("XICM_PHASE_PARENT_DEMO_POOL", str(max(top_k * 6, top_k))))
+    parent_ranked = _rank_augmented_indices(
+        similarity,
+        all_demo_paths,
+        query_geometry,
+        query_affordance,
+        ranking_metric,
+        parent_pool_size,
+    )
+    phase_items = []
+    seen_keys = set()
+    for parent_rank, parent in enumerate(parent_ranked, start=1):
+        task = parent["task"]
+        episode_id = parent["episode_id"]
+        phase_bundle = get_stored_demo_phase_segments(
+            seen_path,
+            task,
+            episode_id,
+            seen_sim_name_to_real_name[task],
+            retrieval_item=parent,
+            cross_task_eval=1,
+        )
+        for phase in phase_bundle.get("phases", []):
+            phase_score = _phase_descriptor_similarity(phase, current_phase)
+            realization_multiplier = _real_phase_compatibility_multiplier(phase, current_phase)
+            parent_attention = float(parent.get("attention_bias", 1.0))
+            score = (
+                0.52 * phase_score
+                + 0.30 * float(parent.get("score", 0.0))
+                + 0.18 * parent_attention
+            ) * realization_multiplier
+            phase_items.append(
+                {
+                    "score": score,
+                    "phase_score": phase_score,
+                    "realization_multiplier": realization_multiplier,
+                    "parent_score": float(parent.get("score", 0.0)),
+                    "parent_attention": parent_attention,
+                    "parent_rank": parent_rank,
+                    "task": task,
+                    "episode_id": episode_id,
+                    "phase": phase,
+                    "parent_item": parent,
+                    "index": parent["index"],
+                    "source": "dynamic_parent_phase",
+                }
+            )
+            seen_keys.add((task, episode_id, phase.get("phase_id")))
+
+    if os.environ.get("XICM_PHASE_DIRECT_RETRIEVAL", "1").strip().lower() not in {"0", "false", "off", "no"}:
+        direct_limit = int(os.environ.get("XICM_PHASE_DIRECT_POOL", str(max(top_k * 20, 80))))
+        direct_candidates = _direct_phase_candidates_from_review(
+            query_geometry,
+            query_affordance,
+            current_phase,
+            direct_limit,
+        )
+        for direct_rank, candidate in enumerate(direct_candidates, start=1):
+            task = candidate["task"]
+            episode_id = candidate["episode_id"]
+            phase, real_phase_score = _real_phase_for_template(
+                task,
+                episode_id,
+                candidate["template_phase"],
+                current_phase,
+            )
+            if not phase:
+                continue
+            key = (task, episode_id, phase.get("phase_id"))
+            if key in seen_keys:
+                continue
+            parent_item = {
+                "score": candidate["score"],
+                "attention_bias": 1.0,
+                "dynamic_rank": f"direct_phase_{direct_rank}",
+                "seen_family": _family_name(candidate.get("seen_profile", {})),
+                "compatibility_tier": "direct_phase_semantic",
+            }
+            realization_multiplier = _real_phase_compatibility_multiplier(phase, current_phase)
+            score = (0.68 * candidate["score"] + 0.32 * real_phase_score) * realization_multiplier
+            phase_items.append(
+                {
+                    "score": score,
+                    "phase_score": real_phase_score,
+                    "realization_multiplier": realization_multiplier,
+                    "parent_score": float(candidate.get("score", 0.0)),
+                    "parent_attention": 1.0,
+                    "parent_rank": f"direct_phase_{direct_rank}",
+                    "task": task,
+                    "episode_id": episode_id,
+                    "phase": phase,
+                    "template_phase": candidate["template_phase"],
+                    "parent_item": parent_item,
+                    "index": -1,
+                    "source": "direct_phase_semantic",
+                }
+            )
+            seen_keys.add(key)
+    phase_items.sort(reverse=True, key=lambda item: item["score"])
+    selected = _select_diverse_phase_items(phase_items, top_k)
+    _write_phase_retrieval_audit(ranking_metric, query_geometry.get("task_key", ""), current_phase, selected)
+    return selected
+
+
 def _compact_summary_value(value):
     if isinstance(value, (list, tuple)):
         return ", ".join(str(item) for item in value[:4]) or "unknown"
@@ -3040,7 +5300,6 @@ def _format_augmented_demo(
     seen_contact_hints = review.get("contact_hints_i") or review.get("affordance_a_i") or {}
     seen_geometry = _canonical_geometry(task_name, review.get("geometry_g_i") or {}, seen_contact_hints)
     if include_geometry:
-        lines.extend([_format_feature_block("Primitive geometry/action descriptor g_i", seen_geometry, GEOMETRY_FIELDS), ""])
         seen_goal_state = retrieval_item.get("seen_goal_state") or _goal_state_descriptor(
             task_name,
             seen_geometry,
@@ -3055,9 +5314,10 @@ def _format_augmented_demo(
             ),
             use_as="seen_demo_goal_state",
         )
-        lines.extend([_format_feature_block("Goal-state/contact-pose descriptor h_i", seen_goal_state, GOAL_STATE_FIELDS), ""])
-    if include_affordance:
-        lines.extend([_format_feature_block("RoboPoint contact hints c_i", seen_contact_hints, CONTACT_HINT_FIELDS), ""])
+        lines.extend([_format_compact_seen_descriptor(seen_geometry, seen_goal_state), ""])
+    # Keep seen contact hints internal for canonicalizing g_i/h_i, but do not
+    # expose c_i in the final Qwen prompt. Only query-side c_j should guide
+    # contact/goal/secondary-object point selection for the current scene.
     if include_scene_summary:
         lines.extend(
             [
@@ -3125,6 +5385,13 @@ def _v3_action_guidance(query_profile):
                 "- Do not grasp the cube directly and do not use a twisting or stacking action pattern.",
             ]
         )
+    elif family == "guided_ring_slide":
+        common.extend(
+            [
+                "- Required mechanics: grasp/hold the wand or ring, move it along the pole toward the end/goal sensor, maintain clearance from the middle pole, then release/stop.",
+                "- Do not use a button-press action pattern; this task succeeds by guided lateral motion along the pole.",
+            ]
+        )
     else:
         common.append("- Choose actions that match the query contact mode even if a high-scoring demo has a different action rhythm.")
     return common
@@ -3179,6 +5446,7 @@ def _format_v4_user_prompt(
         "- Do not use unseen future observations, unseen ground-truth actions, after-states, or unseen demonstrations.",
         "- Prefer descriptors and scene summaries that match the unseen contact mechanics over demos with superficially similar object names.",
         "- h_i is each seen demo's final success state; h_j is the unseen query's final success state. Use h_i only as an analogy and obey h_j.",
+        "- Retrieved seen demonstrations do not provide c_i contact hints. Use only the unseen query's role-labeled contact hints c_j as the current-scene contact/goal/secondary-object point source.",
         "- Copy the target object's current coordinate exactly from the Current observation into target_current_coordinate.",
         "- Choose the active reference part from the Current observation, not a generic support object. For example, use holder/peg/post instead of stand_base when the task requires placing a hole over a stand.",
         "- Copy the active reference part's coordinate exactly from the Current observation into reference_coordinate.",
@@ -3188,7 +5456,13 @@ def _format_v4_user_prompt(
         "Retrieved seen demonstrations summarized for semantic transfer:",
     ]
     if include_geometry:
-        stage1.extend(["", _format_goal_state_field_guide(), ""])
+        stage1.extend(
+            [
+                "",
+                "Descriptor format: seen demos use compact analogy descriptors; the unseen query descriptor is authoritative and overrides conflicting seen-demo goals.",
+                "",
+            ]
+        )
 
     for rank, item in enumerate(ranked, start=1):
         selected_idx = item["index"]
@@ -3224,10 +5498,9 @@ def _format_v4_user_prompt(
         ]
     )
     if include_geometry:
-        stage1.extend([_format_feature_block("Primitive geometry/action descriptor g_j", query_geometry, GEOMETRY_FIELDS), ""])
-        stage1.extend([_format_feature_block("Goal-state/contact-pose descriptor h_j", query_goal_state, GOAL_STATE_FIELDS), ""])
+        stage1.extend([_format_compact_query_descriptor(query_geometry, query_goal_state), ""])
     if include_affordance:
-        stage1.extend([_format_feature_block("RoboPoint contact hints c_j", query_affordance, CONTACT_HINT_FIELDS), ""])
+        stage1.extend([_format_compact_query_contact_hints(query_affordance), ""])
     stage1.extend(
         [
             _format_profile_block("Precise interaction signature p_j", query_profile),
@@ -3306,6 +5579,185 @@ def _format_v4_user_prompt(
     return "\n".join(stage1 + [""] + stage2)
 
 
+def _format_phase_demo(rank, phase_item):
+    phase = phase_item.get("phase", {})
+    parent = phase_item.get("parent_item", {})
+    steps = phase.get("steps", []) or []
+    lines = [
+        f"Retrieved seen phase example {rank}:",
+        f"Parent task: {phase_item.get('task', 'unknown')} episode {phase_item.get('episode_id', 'unknown')}",
+        f"Parent task instruction: {phase.get('task_instruction', 'unknown')}",
+        (
+            "Phase retrieval scores: "
+            f"phase_score={phase_item.get('phase_score', 0.0):.4f}, "
+            f"realization_multiplier={phase_item.get('realization_multiplier', 1.0):.2f}, "
+            f"parent_demo_score={phase_item.get('parent_score', 0.0):.4f}, "
+            f"parent_attention={phase_item.get('parent_attention', 0.0):.2f}, "
+            f"combined={phase_item.get('score', 0.0):.4f}"
+        ),
+        (
+            "Phase descriptor p_i_phase: "
+            f"primitive={phase.get('primitive', 'unknown')}; "
+            f"phase_goal={phase.get('phase_goal', 'unknown')}; "
+            f"contact_state={phase.get('contact_state', 'unknown')}; "
+            f"motion_axis={phase.get('motion_axis', 'unknown')}; "
+            f"target_relation={phase.get('target_relation', 'unknown')}; "
+            f"stop_condition={phase.get('stop_condition', 'unknown')}"
+        ),
+        (
+            "Parent interaction signature: "
+            f"family={parent.get('seen_family', 'unknown')}; "
+            f"compatibility={parent.get('compatibility_tier', 'not_plan_scored')}; "
+            f"dynamic_rank={parent.get('dynamic_rank', 'unknown')}"
+        ),
+        f"Segment rhythm: {len(steps)} action(s). Use this only as a phase-length/motion-rhythm analogy.",
+        "Seen phase observation-action segment:",
+    ]
+    for step in steps:
+        lines.extend(
+            [
+                f"Step {step['step']} observation:",
+                step["observation"],
+                f"Step {step['step']} 7D action:",
+                json.dumps(step["action"]),
+            ]
+        )
+    return "\n".join(lines).rstrip()
+
+
+def _format_phase_history(completed_phases, phase_history):
+    lines = ["Phase memory:"]
+    if completed_phases:
+        lines.append("- completed_phases:")
+        for phase in completed_phases:
+            if isinstance(phase, dict):
+                lines.append(
+                    f"  - phase_id={phase.get('phase_id', '?')}; primitive={phase.get('primitive', 'unknown')}; status={phase.get('status', 'completed')}"
+                )
+            else:
+                lines.append(f"  - {phase}")
+    else:
+        lines.append("- completed_phases: none")
+    if phase_history:
+        lines.append("- previous_phase_actions:")
+        for item in phase_history[-6:]:
+            lines.append(
+                f"  - phase={item.get('phase_id', '?')}:{item.get('primitive', 'unknown')}; action_7d={item.get('action_7d', 'unknown')}"
+            )
+    else:
+        lines.append("- previous_phase_actions: none")
+    return "\n".join(lines)
+
+
+def _format_phase_user_prompt(
+    ranked_phase_items,
+    query_observation,
+    query_task_key,
+    query_task_instruction,
+    query_geometry,
+    query_affordance,
+    action_chain,
+    current_phase_index=0,
+    completed_phases=None,
+    phase_history=None,
+    include_geometry=True,
+    include_affordance=True,
+):
+    completed_phases = completed_phases or []
+    phase_history = phase_history or []
+    query_profile = _interaction_profile(query_task_key, query_geometry, query_affordance)
+    query_goal_state = _goal_state_descriptor(
+        query_task_key,
+        query_geometry,
+        query_affordance,
+        query_profile,
+        raw_goal=(
+            query_geometry.get("goal_state_h_j")
+            or query_geometry.get("target_pose_h_j")
+            or query_geometry.get("target_pose_j")
+            or query_geometry.get("target_pose")
+            or query_geometry.get("goal_state_descriptor_j")
+        ),
+        use_as="query_goal_state",
+    )
+    current_phase = _phase_for_index(action_chain, current_phase_index)
+    query_scene_summary = _scene_summary(
+        query_task_instruction,
+        query_task_key,
+        query_geometry,
+        query_affordance,
+        query_profile,
+    )
+    forbidden = current_phase.get("forbidden_after") or []
+    gripper_guidance = _phase_gripper_guidance(current_phase)
+    action_guidance = _phase_action_guidance(current_phase, query_profile, query_affordance)
+
+    lines = [
+        "Action-Chain X-ICM phase mode.",
+        "",
+        "You will receive one current phase from the unseen task's action chain and retrieved seen phase examples. Each seen example is only a segment of a full demonstration.",
+        "Your job is to output 7D actions for the current phase only, not the whole task.",
+        "",
+        "Critical phase rules:",
+        "- Follow the current_phase primitive and stop_condition.",
+        "- Use completed_phases as hard memory. Do not repeat a completed phase unless the current observation clearly shows it failed.",
+        "- The object identity and coordinates in seen phase examples are analogies only. Never copy seen coordinates directly.",
+        "- Use the unseen current observation and query contact/target anchors c_j as the current-scene coordinate source.",
+        "- If forbidden_after lists a behavior, do not output that behavior in this phase.",
+        "- phase_actions_7d should usually contain more than one action when the current phase requires motion over distance, such as slide, sweep, pull, lift, move, align, insert, or place.",
+        "- Return only one compact JSON object with fields current_phase and phase_actions_7d. phase_actions_7d must be a list of [x,y,z,roll,pitch,yaw,gripper] integer lists.",
+        "",
+        _format_action_chain(action_chain),
+        "",
+        _format_phase_history(completed_phases, phase_history),
+        "",
+        "Current phase:",
+        json.dumps(current_phase, sort_keys=True),
+        f"Forbidden in this phase: {forbidden if forbidden else 'none'}",
+        "Phase-specific gripper guidance:",
+        *gripper_guidance,
+        "",
+        *action_guidance,
+        "",
+        f"Retrieved seen phase examples ({len(ranked_phase_items)}):",
+        "",
+    ]
+    for rank, item in enumerate(ranked_phase_items, start=1):
+        lines.extend([_format_phase_demo(rank, item), ""])
+
+    lines.extend(
+        [
+            "Unseen query:",
+            "Task instruction:",
+            query_task_instruction,
+            "Task key:",
+            query_task_key,
+            "",
+            "Current observation:",
+            query_observation,
+            "",
+        ]
+    )
+    if include_geometry:
+        lines.extend([_format_compact_query_descriptor(query_geometry, query_goal_state), ""])
+    if include_affordance:
+        lines.extend([_format_phase_query_contact_hints(query_affordance, current_phase), ""])
+    lines.extend(
+        [
+            _format_profile_block("Precise interaction signature p_j", query_profile),
+            "",
+            "Scene summary s_j:",
+            query_scene_summary,
+            "",
+            "Output only this JSON shape:",
+            '{"current_phase":"'
+            + current_phase.get("primitive", "unknown")
+            + '","phase_actions_7d":[[x,y,z,roll,pitch,yaw,gripper],...]}',
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _format_augmented_user_prompt(
     ranked,
     all_demo_paths,
@@ -3358,16 +5810,24 @@ def _format_augmented_user_prompt(
         "Important rules:",
         "- Each seen demonstration includes per-key-action observations paired with the corresponding 7D action.",
         "- Treat each retrieved seen demonstration as an analogy, not as the exact target. Transfer the action rhythm only when it is compatible with the unseen query.",
-        "- The unseen query includes only the current/initial observation, task instruction, primitive geometry/action descriptor, and goal-state/contact-pose descriptor.",
-        "- RoboPoint/oracle contact points, when present, are final-action hints only; they were not used to retrieve the demonstrations.",
+        "- The unseen query includes the current/initial observation, task instruction, primitive geometry/action descriptor, goal-state/contact-pose descriptor, and optional role-labeled contact hints c_j.",
+        "- Role-labeled oracle contact points c_j, when present, are final-action hints only; they were not used to retrieve the demonstrations.",
+        "- Retrieved seen demonstrations intentionally omit c_i contact hints. Use only c_j as the current-scene contact/goal/secondary-object point source.",
         "- The unseen h_j descriptor is the desired final success state. If a seen h_i goal conflicts with h_j, follow h_j and use that seen demo only as weak motion evidence.",
         "- Do not use unseen demonstrations, unseen future frames, unseen ground-truth actions, or after-states.",
         "- Preserve the X-ICM output format: only a list of 7D action lists, such as [[x, y, z, roll, pitch, yaw, gripper], ...].",
     ]
     if include_geometry:
-        lines.extend(["", _format_geometry_field_guide(), "", _format_goal_state_field_guide()])
+        lines.extend(
+            [
+                "",
+                "Descriptor format:",
+                "- Seen demos provide compact analogy descriptors only; use them to choose a compatible action rhythm.",
+                "- The unseen query provides the authoritative descriptor; obey it over any conflicting seen-demo relation.",
+            ]
+        )
     if include_affordance:
-        lines.extend(["", _format_contact_field_guide()])
+        lines.append("- Query contact hints c_j are the only role-labeled contact/goal/secondary-object points in the prompt.")
     if use_v2:
         lines.extend(
             [
@@ -3423,10 +5883,9 @@ def _format_augmented_user_prompt(
         "",
     ])
     if include_geometry:
-        lines.extend([_format_feature_block("Primitive geometry/action descriptor g_j", query_geometry, GEOMETRY_FIELDS), ""])
-        lines.extend([_format_feature_block("Goal-state/contact-pose descriptor h_j", query_goal_state, GOAL_STATE_FIELDS), ""])
+        lines.extend([_format_compact_query_descriptor(query_geometry, query_goal_state), ""])
     if include_affordance:
-        lines.extend([_format_feature_block("RoboPoint contact hints c_j", query_affordance, CONTACT_HINT_FIELDS), ""])
+        lines.extend([_format_compact_query_contact_hints(query_affordance), ""])
     if use_v2:
         lines.extend([_format_profile_block("Precise interaction signature p_j", query_profile), ""])
     if use_v3:

@@ -40,6 +40,13 @@ checkpoints/
 logs/
 *.log
 
+# Runtime media and generated inspection sidecars
+*.mp4
+*.avi
+*.mov
+*.webm
+*.inspect.ndjson
+
 # Generated reports and presentation exports
 outputs/
 work/
@@ -48,10 +55,12 @@ work/
 # Keep source code, launch scripts, fixtures, and docs in Git; keep generated
 # benchmark logs, review packets, images, tables, and pulled CAIR artifacts
 # only on the local machine or CAIR.
+results/
 test_files/geometry_affordance_probe/ablation_results/
 test_files/geometry_affordance_probe/batch_*/
 test_files/geometry_affordance_probe/review/
 test_files/geometry_affordance_probe/figures/
+test_files/geometry_affordance_probe/live_view/
 test_files/xicm_baseline_results/
 
 # Local CAIR transfer runtime state
@@ -59,3 +68,13 @@ test_files/geometry_affordance_probe/*.pid
 test_files/geometry_affordance_probe/*.lock
 test_files/geometry_affordance_probe/ablation_results/.v4_k6_last_strict_count
 test_files/geometry_affordance_probe/ablation_results/cair_logs/_archived_partial_v4/
+
+# Parked future-idea branch. Keep phase/action-chain experiments local until
+# they are intentionally promoted; the current push surface is the frozen
+# double-retrieval rerank checkpoint only.
+X-ICM/scripts/generate_phase_review_trace.py
+test_files/geometry_affordance_probe/phase_action_chain_status.md
+test_files/geometry_affordance_probe/cair_setup_scripts/*phase*
+test_files/geometry_affordance_probe/cair_setup_scripts/validate_phase_model_runtime_from_local.sh
+test_files/geometry_affordance_probe/cair_setup_scripts/watch_phase_live_frames_from_local.sh
+test_files/geometry_affordance_probe/scripts/*phase*

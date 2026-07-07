@@ -1,107 +1,110 @@
 # Geometry/Affordance Probe
 
-This folder contains the current X-ICM geometry/contact ablation code plus a
-small amount of historical experiment code. Generated result files, CAIR logs,
-review packets, figures, and local batch outputs are intentionally ignored by
-Git.
+This folder is now organized around the current double-retrieval rerank checkpoint.
+Generated result folders, review packets, CAIR logs, videos, local cache
+batches, and parked phase/action-chain files are ignored by Git.
 
-For the script-by-script map, start with:
+## Active Checkpoint
 
-- `SCRIPT_INDEX.md`
+Use either stable ranking name:
 
-## Active Pipeline
+```text
+lang_vis.out.geo.aff_v3.retrieval_reranking
+lang_vis.out.geo.aff_v3.rerank_top50
+```
 
-The current pipeline is the closed-loop no-plan QwenVL ablation:
+The active pipeline is:
 
-1. Build a seen-demo cache from the 18 seen AGNOSTOS families.
-2. For each seen demo, cache QwenVL geometry and target-pose descriptors from
-   front plus overhead observations.
-3. At evaluation time, observe the unseen scene, retrieve top-k seen demos with
-   dynamics plus geometry/target-pose scoring, and prompt QwenVL with the
-   current front plus overhead images.
-4. In closed loop, execute one primitive, observe again, retrieve again from the
-   new scene state, and repeat for the configured replans.
-5. Compare the geometry-only row with the geometry plus contact-points row.
+1. Broad retrieval with the original X-ICM dynamic diffusion similarity.
+2. Keep the top `XICM_GA_RERANK_CANDIDATES` candidates, default `50`.
+3. Fine rerank that shortlist with geometry, target-pose/profile compatibility,
+   and conflict penalties.
+4. Build the final QwenVL prompt from selected seen demos, current front plus
+   overhead query images, compact descriptors, and query-only role-labeled
+   contact hints `c_j`.
 
-Plan-guided retrieval is not part of the active run. The active ranking methods
-are:
+Seen-demo contact hints `c_i` stay internal. Plan-guided retrieval, closed-loop
+ablations, and phase/action-chain retrieval are not part of this checkpoint.
 
-- `lang_vis.out.geo.closed_loop`
-- `lang_vis.out.geo.aff.closed_loop`
+## Files To Commit
+
+The current double-retrieval push surface is:
+
+```text
+X-ICM/form_icl_demonstrations_crosstask_ranking.py
+X-ICM/crosstask_icl_agent.py
+X-ICM/scripts/generate_rerank_review_trace.py
+test_files/geometry_affordance_probe/retrieval_reranking_model_freeze.md
+test_files/geometry_affordance_probe/SCRIPT_INDEX.md
+test_files/geometry_affordance_probe/README.md
+test_files/geometry_affordance_probe/scripts/verify_rerank_checkpoint_static.py
+test_files/geometry_affordance_probe/cair_setup_scripts/run_rerank_top50_k4_k8_5ep_on_cair.sh
+test_files/geometry_affordance_probe/cair_setup_scripts/watch_rerank_top50_k4_k8_5ep_from_local.sh
+test_files/geometry_affordance_probe/cair_setup_scripts/run_rerank_top50_all23_1ep_video_on_cair.sh
+test_files/geometry_affordance_probe/cair_setup_scripts/pull_rerank_top50_all23_1ep_video_from_cair.sh
+```
 
 ## Main Commands
 
-Clean geometry/target-pose seen cache:
+Generate a five-task review packet on CAIR:
 
 ```bash
-bash test_files/geometry_affordance_probe/cair_setup_scripts/launch_full_seen_geometry_target_pose_v2_cache_on_cair.sh
+cd /data/yf23/projects/ICRA27-ROBOT/X-ICM
+export XICM_GA_RERANK_CANDIDATES=50
+export XICM_GA_REVIEW_BUNDLE=/data/yf23/projects/ICRA27-ROBOT/experiments/geometry_affordance_full_cache/review_bundle.jsonl
+python3 scripts/generate_rerank_review_trace.py \
+  --name rerank_top50_k5_pipeline_review \
+  --count 5 \
+  --top-k 5 \
+  --rerank-candidates 50 \
+  --ranking-metric lang_vis.out.geo.aff_v3.rerank_top50
 ```
 
-Baseline Qwen text versus QwenVL front+overhead:
+Run the frozen k4/k8 quick comparison on CAIR:
 
 ```bash
-bash test_files/geometry_affordance_probe/cair_setup_scripts/run_xicm_qwen_vs_qwenvl_front_top_baseline_on_cair.sh
+bash test_files/geometry_affordance_probe/cair_setup_scripts/run_rerank_top50_k4_k8_5ep_on_cair.sh
 ```
 
-Closed-loop no-plan ablation:
+Watch that run from local:
 
 ```bash
-DEMO_NUM_PER_ICL=10 bash test_files/geometry_affordance_probe/cair_setup_scripts/run_xicm_qwenvl_closed_loop_no_plan_5ep_ablation_on_cair.sh
+ONCE=1 bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_rerank_top50_k4_k8_5ep_from_local.sh
 ```
 
-Closed-loop watcher and local CSV collector:
+Run the one-episode all-task video smoke:
 
 ```bash
-INTERVAL_SECONDS=120 \
-COLLECT_METHOD_SET=closed_loop_no_plan \
-RANKING_METHODS=lang_vis.out.geo.closed_loop,lang_vis.out.geo.aff.closed_loop \
-bash test_files/geometry_affordance_probe/cair_setup_scripts/watch_and_update_xicm_qwenvl_5ep_component_ablation_from_local.sh
+K=8 EPISODES=1 ENABLE_VIDEO=1 RECORD_EVERY_N=1 \
+bash test_files/geometry_affordance_probe/cair_setup_scripts/run_rerank_top50_all23_1ep_video_on_cair.sh
 ```
 
-## Current Results
+Pull the latest all-task video smoke to the local review folder:
 
-The combined k-sweep and baseline comparison lives locally at:
+```bash
+bash test_files/geometry_affordance_probe/cair_setup_scripts/pull_rerank_top50_all23_1ep_video_from_cair.sh
+```
+
+Run the fast local static verifier:
+
+```bash
+python3 test_files/geometry_affordance_probe/scripts/verify_rerank_checkpoint_static.py
+```
+
+## Local-Only Outputs
+
+Do not commit these paths:
 
 ```text
-test_files/geometry_affordance_probe/ablation_results/closed_loop_no_plan_k4_k6_k8_k10_comparison_2026-06-30.csv
+results/
+outputs/
+test_files/geometry_affordance_probe/ablation_results/
+test_files/geometry_affordance_probe/batch_*/
+test_files/geometry_affordance_probe/review/
+test_files/geometry_affordance_probe/figures/
+test_files/geometry_affordance_probe/live_view/
 ```
 
-Latest averages:
-
-| Row | Average |
-|---|---:|
-| Qwen text baseline | 26.96 |
-| QwenVL front+overhead baseline | 28.70 |
-| closed loop geo, k10 | 15.65 |
-| closed loop geo+contact, k10 | 13.04 |
-| closed loop geo, k8 | 18.26 |
-| closed loop geo+contact, k8 | 15.65 |
-| closed loop geo, k6 | 17.39 |
-| closed loop geo+contact, k6 | 13.04 |
-| closed loop geo, k4 | 16.52 |
-| closed loop geo+contact, k4 | 13.04 |
-
-## Folder Layout
-
-- `scripts/`: active Python utilities for cache building, QwenVL descriptor
-  extraction, retrieval scoring, prompt rendering, and result collection.
-- `cair_setup_scripts/`: active CAIR launch, watch, download, and sync wrappers.
-- `legacy/`: older v1-v4 launchers, one-off review builders, old collectors,
-  and pilot scripts. Keep these for reference, but do not start new work there.
-- `fixtures/`: small prompt-format fixtures that are safe to commit.
-- `ablation_results/`: local-only pulled logs and CSV/Markdown outputs.
-- `review/`, `figures/`, `batch_*/`: local-only generated inspection artifacts.
-
-## Git Tracking Policy
-
-Commit source code, launch scripts, fixtures, and documentation. Do not commit:
-
-- demo/review images
-- model descriptor JSON from generated Qwen/RoboPoint runs
-- CAIR logs and pulled benchmark folders
-- ablation CSV/Markdown/JSON result tables
-- generated figures and presentation exports
-
-Those outputs stay on this machine or on CAIR. Regenerate or pull them when
-needed.
-
+Do not commit runtime media (`*.mp4`, `*.avi`, `*.mov`, `*.webm`) or generated
+PowerPoint inspection sidecars (`*.inspect.ndjson`). These stay local or on
+CAIR and can be regenerated or pulled when needed.

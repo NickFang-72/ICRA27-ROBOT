@@ -1,52 +1,53 @@
 # Geometry/Affordance Script Index
 
-Use this file as the map for the cleaned probe folder. Active code stays in
-`scripts/` and `cair_setup_scripts/`. Historical one-offs and superseded
-experiment launchers live in `legacy/`.
+This is the cleaned map for the current double-retrieval rerank checkpoint. It
+intentionally excludes parked phase/action-chain scripts and generated review
+artifacts from the Git surface.
 
-## Active Python Scripts
+## Current Double-Retrieval Files
+
+| File | Purpose |
+|---|---|
+| `X-ICM/form_icl_demonstrations_crosstask_ranking.py` | Implements broad dynamic retrieval, top-50 shortlist selection, fine geometry/profile rerank, and final prompt construction. |
+| `X-ICM/crosstask_icl_agent.py` | Builds QwenVL messages with current query images and parses the returned 7D key actions. |
+| `X-ICM/scripts/generate_rerank_review_trace.py` | Writes inspectable query extraction, broad retrieval, fine rerank, selected demos, final prompt, and contact-overlay artifacts. |
+| `scripts/verify_rerank_checkpoint_static.py` | Fast local verifier for the frozen rerank checkpoint, aliases, docs, and runner defaults. |
+| `retrieval_reranking_model_freeze.md` | Human-readable freeze note for the active model. |
+
+## Current CAIR Helpers
 
 | Script | Purpose |
 |---|---|
-| `scripts/apply_qwen_geometry_strict_rules.py` | Applies deterministic cleanup rules to QwenVL geometry descriptors. |
-| `scripts/cache_all_seen_geometry_affordance.py` | Builds the full seen-demo manifest/cache and runs geometry normalization stages. |
-| `scripts/collect_xicm_qwenvl_5ep_component_ablation_results.py` | Collects QwenVL 5-episode ablation logs into paper-style CSV/Markdown tables, including closed-loop no-plan runs. |
-| `scripts/prepare_xicm_key_action_trajectories.py` | Converts retrieved seen episodes into observation/action trajectory payloads for X-ICM-style prompts. |
-| `scripts/project_robopoint_contacts_to_pointcloud.py` | Utility for projecting contact points into scene geometry when contact diagnostics are needed. |
-| `scripts/qwen_retrieval_geometry_rules.py` | Shared deterministic rules for geometry/target-pose retrieval descriptors. |
-| `scripts/render_xicm_geometry_affordance_prompt.py` | Renders prompt payloads with descriptor and key-action trajectory context. |
-| `scripts/run_qwen_dual_view_geometry_target_pose.py` | Runs QwenVL on front plus overhead views and returns geometry plus target-pose JSON. |
-| `scripts/run_qwen_dual_view_retrieval_geometry.py` | Runs QwenVL geometry extraction for retrieval-oriented scene descriptors. |
-| `scripts/score_xicm_geometry_affordance_retrieval.py` | Scores retrieved demonstrations using X-ICM dynamics plus geometry/contact descriptor terms. |
-| `scripts/tune_geometry_affordance_weights.py` | Tunes old-style geometry/contact retrieval weights on seen validation data. |
-| `scripts/tune_seen_validation_from_xicm_features.py` | Tunes current retrieval features from seen validation/X-ICM feature tables. |
+| `cair_setup_scripts/run_rerank_top50_k4_k8_5ep_on_cair.sh` | Runs the active rerank checkpoint for k4 and k8 quick comparison. |
+| `cair_setup_scripts/watch_rerank_top50_k4_k8_5ep_from_local.sh` | Watches the k4/k8 run from the local machine. |
+| `cair_setup_scripts/run_rerank_top50_all23_1ep_video_on_cair.sh` | Runs one episode per unseen task with video recording enabled. |
+| `cair_setup_scripts/pull_rerank_top50_all23_1ep_video_from_cair.sh` | Pulls the video smoke review folder, MP4s, logs, and score CSV to local. |
 
-## Active CAIR Scripts
+## Supporting Tracked Utilities
+
+These files are still useful for the active checkpoint but are not the main
+method entry point:
 
 | Script | Purpose |
 |---|---|
-| `cair_setup_scripts/cair_download_full_agnostos_and_xicm_model.sh` | Bootstrap download for AGNOSTOS data and the X-ICM model on CAIR. |
-| `cair_setup_scripts/cair_download_robopoint.sh` | Bootstrap download for RoboPoint checkpoints/resources. |
-| `cair_setup_scripts/cair_parallel_agnostos_seen_download.sh` | Parallel CAIR download helper for seen AGNOSTOS assets. |
-| `cair_setup_scripts/launch_full_seen_geometry_target_pose_v2_cache_on_cair.sh` | Launches the active clean geometry/target-pose cache build on CAIR. |
-| `cair_setup_scripts/run_xicm_qwen_vs_qwenvl_front_top_baseline_on_cair.sh` | Runs the baseline comparison: Qwen text-only versus QwenVL front+overhead. |
-| `cair_setup_scripts/run_xicm_qwenvl_ablation_matrix_on_cair.sh` | Generic CAIR ablation engine used by wrapper scripts. Defaults are legacy; call wrappers for real runs. |
-| `cair_setup_scripts/run_xicm_qwenvl_closed_loop_no_plan_5ep_ablation_on_cair.sh` | Main active launcher for closed-loop no-plan geometry and geometry+contact rows. |
-| `cair_setup_scripts/stream_archives_to_cair_from_local.sh` | Streams local archive payloads to CAIR. |
-| `cair_setup_scripts/stream_qwen25_7b_to_cair_from_local.sh` | Streams the local Qwen2.5 model payload to CAIR. |
-| `cair_setup_scripts/watch_and_update_xicm_qwen_vs_qwenvl_front_top_from_local.sh` | Watches/pulls the active baseline comparison and refreshes local CSVs. |
-| `cair_setup_scripts/watch_and_update_xicm_qwenvl_5ep_component_ablation_from_local.sh` | Watches/pulls QwenVL component or closed-loop no-plan ablations and runs the collector. |
-| `cair_setup_scripts/watch_full_seen_geometry_target_pose_v2_cache_progress.sh` | Checks active clean geometry/target-pose cache progress on CAIR. |
-| `cair_setup_scripts/xvfb-run` | Local wrapper used by headless CAIR/RLBench execution. |
+| `scripts/apply_qwen_geometry_strict_rules.py` | Deterministic cleanup rules for QwenVL geometry descriptors. |
+| `scripts/cache_all_seen_geometry_affordance.py` | Builds the seen-demo manifest/cache used by descriptor retrieval. |
+| `scripts/prepare_xicm_key_action_trajectories.py` | Converts seen episodes into observation/action trajectory payloads. |
+| `scripts/project_robopoint_contacts_to_pointcloud.py` | Projects diagnostic contact points into scene geometry. |
+| `scripts/qwen_retrieval_geometry_rules.py` | Shared geometry/target-pose descriptor rules. |
+| `scripts/render_xicm_geometry_affordance_prompt.py` | Renders prompt payloads for inspection. |
+| `scripts/run_qwen_dual_view_geometry_target_pose.py` | Extracts dual-view geometry and target-pose descriptors. |
+| `scripts/run_qwen_dual_view_retrieval_geometry.py` | Extracts retrieval-oriented scene descriptors. |
+| `scripts/score_xicm_geometry_affordance_retrieval.py` | Scores retrieved demos with geometry/contact descriptor terms. |
+| `scripts/tune_geometry_affordance_weights.py` | Legacy tuning helper for descriptor weights. |
+| `scripts/tune_seen_validation_from_xicm_features.py` | Tunes retrieval features from seen validation/X-ICM feature tables. |
 
-## Legacy Scripts
+## Ignored Local Work
 
-`legacy/scripts/` contains older review builders, old single-view Qwen/RoboPoint
-pilots, old v1 collectors, and normalization helpers that were superseded by the
-current dual-view geometry/target-pose cache path.
+The parked phase/action-chain branch is intentionally ignored by `.gitignore`.
+Generated folders such as `results/`, `outputs/`, `review/`, `batch_*`, logs,
+runtime videos, and presentation inspection sidecars are also local-only.
 
-`legacy/cair_setup_scripts/` contains older v1-v4 launchers and watchers,
-including plan-guided and semantic-plan experiments. They are retained for
-reference only. Some call paths are historical and may need adjustment before
-rerunning.
-
+Before pushing, `git status --short --untracked-files=all` should show only
+source/docs/scripts for the current rerank checkpoint, not result folders or
+runtime artifacts.
