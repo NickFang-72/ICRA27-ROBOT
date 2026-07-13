@@ -1,0 +1,78 @@
+# Phase-memory commit surface.
+#
+# This copied project contains large third-party/runtime folders from the
+# original X-ICM checkout. Keep the commit focused on the phase-memory pipeline
+# source, review utilities, and docs.
+
+*
+
+# Project-level source and docs.
+!/.gitignore
+!/README.md
+!/PHASE_MEMORY_PIPELINE.md
+!/PHASE_ANCHOR_PIPELINE.md
+!/LICENSE
+!/config.yaml
+!/main.py
+!/crosstask_icl_agent.py
+!/form_icl_demonstrations_crosstask_ranking.py
+!/phase_interpreter.py
+!/utils.py
+
+# Phase interpreter -> anchor compiler -> memory controller code.
+!/phase_anchor_pipeline/
+!/phase_anchor_pipeline/*.py
+!/phase_memory_pipeline/
+!/phase_memory_pipeline/*.py
+
+# Current review/benchmark scripts only.
+!/scripts/
+/scripts/*
+!/scripts/collect_phase_memory_runtime_review.py
+!/scripts/generate_phase_anchor_pipeline_review.py
+!/scripts/generate_phase_benchmark_review.py
+!/scripts/generate_phase_interpreter_review.py
+!/scripts/generate_phase_memory_packet_review.py
+!/scripts/generate_rerank_review_trace.py
+!/scripts/launch_phase_memory_benchmark_5ep_from_local.sh
+!/scripts/run_phase_memory_review_on_cair.sh
+!/scripts/run_phase_memory_smoke_on_cair.sh
+
+# Never commit generated or local runtime material if the allowlist changes.
+__pycache__/
+*.py[cod]
+*.log
+*.mp4
+*.avi
+*.mov
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ttm
+*.ttt
+*.obj
+*.mtl
+*.urdf
+*.npy
+*.npz
+*.pkl
+*.pt
+*.pth
+*.safetensors
+.pixi/
+.venv/
+venv/
+CoppeliaSim/
+data/
+logs/
+outputs/
+review/
+results/
+work/
+PyRep/
+RLBench/
+YARR/
+qwen2vl_finetune/
+docs/

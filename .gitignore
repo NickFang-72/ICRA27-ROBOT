@@ -56,6 +56,7 @@ work/
 # benchmark logs, review packets, images, tables, and pulled CAIR artifacts
 # only on the local machine or CAIR.
 results/
+review/
 test_files/geometry_affordance_probe/ablation_results/
 test_files/geometry_affordance_probe/batch_*/
 test_files/geometry_affordance_probe/review/
@@ -69,9 +70,12 @@ test_files/geometry_affordance_probe/*.lock
 test_files/geometry_affordance_probe/ablation_results/.v4_k6_last_strict_count
 test_files/geometry_affordance_probe/ablation_results/cair_logs/_archived_partial_v4/
 
-# Parked future-idea branch. Keep phase/action-chain experiments local until
-# they are intentionally promoted; the current push surface is the frozen
-# double-retrieval rerank checkpoint only.
+# Parked experiment copies. Keep older phase/action-chain branches local; the
+# current promotable copied project is `X-ICM-phase-memory/`, which has its own
+# allowlist .gitignore so only the phase-memory pipeline code is added.
+X-ICM-phase-anchor/
+X-ICM/phase_interpreter.py
+X-ICM/scripts/generate_phase_interpreter_review.py
 X-ICM/scripts/generate_phase_review_trace.py
 test_files/geometry_affordance_probe/phase_action_chain_status.md
 test_files/geometry_affordance_probe/cair_setup_scripts/*phase*

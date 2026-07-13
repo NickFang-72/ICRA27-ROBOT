@@ -1,0 +1,282 @@
+import gc
+import logging
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ['VLLM_WORKER_MULTIPROC_METHOD'] = 'spawn'
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
+from rlbench import CameraConfig, ObservationConfig
+from rlbench.action_modes.action_mode import MoveArmThenGripper
+from rlbench.action_modes.arm_action_modes import EndEffectorPoseViaPlanning
+from rlbench.action_modes.gripper_action_modes import Discrete
+from rlbench.backend import task as rlbench_task
+from rlbench.backend.utils import task_file_to_task_class
+from pyrep.const import RenderMode
+
+from crosstask_icl_agent import CrossTaskICLAgent
+from yarr.runners.independent_env_runner import IndependentEnvRunner
+from yarr.utils.stat_accumulator import SimpleAccumulator
+from yarr.utils.rollout_generator import RolloutGenerator
+
+from openai import OpenAI
+from transformers import AutoModelForCausalLM, AutoTokenizer, Qwen2VLForConditionalGeneration, AutoProcessor
+import torch
+from vllm import LLM, SamplingParams 
+from qwen_vl_utils import process_vision_info
+
+from utils import CAMERAS, SCENE_BOUNDS, ROTATION_RESOLUTION, VOXEL_SIZE, IMAGE_SIZE
+import multiprocessing
+import torch
+from torch.multiprocessing import Manager
+torch.multiprocessing.set_sharing_strategy('file_system')
+
+import sys
+PROJECT_ROOT=os.path.dirname(os.path.abspath(__file__))
+
+
+
+def create_obs_config():
+    unused_cams = CameraConfig()
+    unused_cams.set_all(False)
+    used_cams = CameraConfig(
+        rgb=True,
+        point_cloud=True,
+        mask=True,
+        depth=False,
+        image_size=IMAGE_SIZE,
+        render_mode=RenderMode.OPENGL)
+
+    cam_obs = []
+    kwargs = {}
+    for n in CAMERAS:
+        kwargs[n] = used_cams
+        cam_obs.append('%s_rgb' % n)
+        cam_obs.append('%s_pointcloud' % n)
+
+    obs_config = ObservationConfig(
+        front_camera=kwargs.get('front', unused_cams),
+        left_shoulder_camera=kwargs.get('left_shoulder', unused_cams),
+        right_shoulder_camera=kwargs.get('right_shoulder', unused_cams),
+        wrist_camera=kwargs.get('wrist', unused_cams),
+        overhead_camera=kwargs.get('overhead', unused_cams),
+        joint_forces=False,
+        joint_positions=True,
+        joint_velocities=True,
+        task_low_dim_state=False,
+        gripper_touch_forces=False,
+        gripper_pose=True,
+        gripper_open=True,
+        gripper_matrix=True,
+        gripper_joint_positions=True,
+    )
+    return obs_config
+
+def eval_seed(eval_cfg,
+              logdir,
+              cams,
+              env_device,
+              multi_task,
+              seed,
+              env_config,
+              components) -> None:
+
+
+    tasks = eval_cfg.rlbench.tasks
+    rg = RolloutGenerator()
+
+    agent = CrossTaskICLAgent(
+        eval_cfg.rlbench.task_name, eval_cfg.framework.demo_num_per_icl,
+        eval_cfg.framework.start_seed,
+        eval_cfg.framework.ranking_method
+        )
+
+    stat_accum = SimpleAccumulator(eval_video_fps=30)
+
+    env_runner = IndependentEnvRunner(
+        train_env=None,
+        agent=agent,
+        train_replay_buffer=None,
+        num_train_envs=0,
+        num_eval_envs=eval_cfg.framework.eval_envs,
+        rollout_episodes=99999,
+        eval_episodes=eval_cfg.framework.eval_episodes,
+        training_iterations=0,
+        eval_from_eps_number=eval_cfg.framework.eval_from_eps_number,
+        episode_length=eval_cfg.rlbench.episode_length,
+        stat_accumulator=stat_accum,
+        weightsdir=eval_cfg.framework.logdir,
+        logdir=logdir,
+        env_device=env_device,
+        rollout_generator=rg,
+        num_eval_runs=1,
+        multi_task=multi_task,
+        components=components)
+
+    manager = Manager()
+    save_load_lock = manager.Lock()
+    writer_lock = manager.Lock()
+    
+    env_runner.start({"task": eval_cfg.framework.logdir}, save_load_lock, writer_lock,
+                              env_config, 0,
+                              eval_cfg.framework.eval_save_metrics,
+                              eval_cfg.cinematic_recorder)
+
+
+    del env_runner
+    del agent
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+
+def load_weight(savedir):
+    components={}
+    is_vl_model = False
+    normalized_savedir = savedir.lower().replace("-", "_")
+    if ("PhaseAnchorReplay" in savedir or "phase_anchor" in normalized_savedir) and "phase_memory" not in normalized_savedir:
+        print("PhaseAnchorReplay mode: no VLM weights loaded.")
+        components["is_vl_model"] = False
+        return components
+
+    ################ vllm local deploy ########################
+    if "Qwen2.5.VL.7B.instruct" in savedir or "phase_memory" in normalized_savedir:
+        is_vl_model = True
+        model_name = os.environ.get(
+            "XICM_QWEN25_VL_7B_PATH",
+            "/data/yf23/checkpoints/ICRA27-ROBOT/Qwen2.5-VL-7B-Instruct",
+        )
+        if not os.path.exists(model_name):
+            model_name = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+    elif "Qwen2.5.7B.instruct" in savedir:
+        ### load Qwen2.5-7B-Instruct from local file
+        ### TODO: download from huggingface, change the path
+        model_name = os.environ.get(
+            "XICM_QWEN_7B_PATH",
+            "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28",
+        )
+        
+        ### load model from huggingface if not loaded from local file
+        if not os.path.exists(model_name):
+            model_name = "Qwen/Qwen2.5-7B-Instruct"
+
+    elif "Qwen2.5.72B.instruct" in savedir:
+        ### load Qwen2.5-72B-Instruct from local file
+        ### TODO: download from huggingface, change the path
+        model_name = os.environ.get(
+            "XICM_QWEN_72B_PATH",
+            "/remote-home/jiamingz/projects/huggingface/hub/models--Qwen--Qwen2.5-72B-Instruct/snapshots/495f39366efef23836d0cfae4fbe635880d2be31",
+        )
+        
+        ### load model from huggingface if not loaded from local file
+        if not os.path.exists(model_name):
+            model_name = "Qwen/Qwen2.5-72B-Instruct"
+    else:
+        model_name = os.environ.get("XICM_QWEN_7B_PATH", "Qwen/Qwen2.5-7B-Instruct")
+
+    print("loading %s"%model_name)
+
+    llm_kwargs = {
+        "model": model_name,
+        "tensor_parallel_size": max(1, torch.cuda.device_count()),
+        "gpu_memory_utilization": float(os.environ.get("XICM_VLLM_GPU_MEMORY_UTILIZATION", "0.8")),
+        "trust_remote_code": is_vl_model,
+    }
+    max_model_len = os.environ.get("XICM_VLLM_MAX_MODEL_LEN")
+    if max_model_len:
+        llm_kwargs["max_model_len"] = int(max_model_len)
+    if is_vl_model:
+        llm_kwargs["limit_mm_per_prompt"] = {"image": int(os.environ.get("XICM_VL_MAX_IMAGES", "2"))}
+        mm_processor_kwargs = {}
+        if os.environ.get("XICM_VL_MIN_PIXELS"):
+            mm_processor_kwargs["min_pixels"] = int(os.environ["XICM_VL_MIN_PIXELS"])
+        if os.environ.get("XICM_VL_MAX_PIXELS"):
+            mm_processor_kwargs["max_pixels"] = int(os.environ["XICM_VL_MAX_PIXELS"])
+        if mm_processor_kwargs:
+            llm_kwargs["mm_processor_kwargs"] = mm_processor_kwargs
+    if os.environ.get("XICM_VLLM_ENFORCE_EAGER", "0") == "1":
+        llm_kwargs["enforce_eager"] = True
+
+    llm = LLM(**llm_kwargs)
+    processor_kwargs = {"trust_remote_code": is_vl_model}
+    if is_vl_model and os.environ.get("XICM_VL_MIN_PIXELS"):
+        processor_kwargs["min_pixels"] = int(os.environ["XICM_VL_MIN_PIXELS"])
+    if is_vl_model and os.environ.get("XICM_VL_MAX_PIXELS"):
+        processor_kwargs["max_pixels"] = int(os.environ["XICM_VL_MAX_PIXELS"])
+    processor = AutoProcessor.from_pretrained(model_name, **processor_kwargs)
+        
+    components['llm'] = llm
+    components['processor']=processor
+    components['is_vl_model'] = is_vl_model
+
+    return components
+
+
+@hydra.main(config_name='config', config_path='.')
+def main(eval_cfg: DictConfig) -> None:
+    logging.info('\n' + OmegaConf.to_yaml(eval_cfg))
+
+    start_seed = eval_cfg.framework.start_seed
+    eval_cfg.rlbench.demo_path = os.path.join(PROJECT_ROOT, eval_cfg.rlbench.demo_path)
+    eval_cfg.framework.logdir = os.path.join(PROJECT_ROOT, eval_cfg.framework.logdir)
+
+    env_device = 'cuda'
+    logging.info('Using env device %s.' % str(env_device))
+
+    gripper_mode = Discrete()
+    arm_action_mode = EndEffectorPoseViaPlanning()
+    action_mode = MoveArmThenGripper(arm_action_mode, gripper_mode)
+
+    task_files = [t.replace('.py', '') for t in os.listdir(rlbench_task.TASKS_PATH)
+                  if t != '__init__.py' and t.endswith('.py')]
+    eval_cfg.rlbench.cameras = CAMERAS
+    
+    obs_config = create_obs_config()      
+
+    if eval_cfg.cinematic_recorder.enabled:
+        obs_config.record_gripper_closing = True
+
+    tasks = eval_cfg.rlbench.tasks
+    multi_task = False
+
+    print("tasks:", tasks)
+
+    components=load_weight(os.path.join(eval_cfg.framework.logdir,
+                            eval_cfg.method.name))
+
+    for task_id, task in enumerate(tasks):
+
+        eval_cfg.rlbench.task_name=task
+
+        logdir = os.path.join(eval_cfg.framework.logdir,
+                            eval_cfg.method.name,
+                            eval_cfg.rlbench.task_name,
+                            'seed%d' % start_seed)
+
+        print(f"evaluating: task_id: {task_id}, task_name: {task}")
+        if task not in task_files:
+            raise ValueError('Task %s not recognised!.' % task)
+        task_class = task_file_to_task_class(task)
+
+        env_config = (task_class,
+                      obs_config,
+                      action_mode,
+                      eval_cfg.rlbench.demo_path,
+                      eval_cfg.rlbench.episode_length,
+                      eval_cfg.rlbench.headless,
+                      True,
+                      eval_cfg.rlbench.time_in_state,
+                      eval_cfg.framework.record_every_n)
+
+        logging.info('Evaluating seed %d.' % start_seed)
+        eval_seed(eval_cfg,
+                    logdir,
+                    eval_cfg.rlbench.cameras,
+                    env_device,
+                    multi_task, start_seed,
+                    env_config,
+                    components)
+
+if __name__ == '__main__':
+    main()
